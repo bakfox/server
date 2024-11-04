@@ -4,6 +4,10 @@ import readlineSync from 'readline-sync';
 class Player {
   constructor() {
     this.hp = 100;
+    this.atck = 1;
+    this.luck = 0;
+    this.str = 0;
+    this.dex = 0;
   }
 
   attack() {
@@ -14,6 +18,7 @@ class Player {
 class Monster {
   constructor() {
     this.hp = 100;
+    this.atck = 1;
   }
 
   attack() {
@@ -21,53 +26,44 @@ class Monster {
   }
 }
 
-function displayStatus(stage, player, monster) {
+function displayStatus(day, player, monster) {
   console.log(chalk.magentaBright(`\n=== Current Status ===`));
   console.log(
-    chalk.cyanBright(`| Stage: ${stage} `) +
-    chalk.blueBright(
-      `| 플레이어 정보`,
-    ) +
-    chalk.redBright(
-      `| 몬스터 정보 |`,
-    ),
+    chalk.cyanBright(`| Stage: ${day} `) +
+      chalk.blueBright(`| 플레이어 정보`) +
+      chalk.redBright(`| 몬스터 정보 |`),
   );
   console.log(chalk.magentaBright(`=====================\n`));
 }
 
-const battle = async (stage, player, monster) => {
+const battle = async (day, player, monster) => {
   let logs = [];
 
-  while(player.hp > 0) {
+  while (player.hp > 0) {
     console.clear();
-    displayStatus(stage, player, monster);
+    displayStatus(day, player, monster);
 
     logs.forEach((log) => console.log(log));
 
-    console.log(
-      chalk.green(
-        `\n1. 공격한다 2. 아무것도 하지않는다.`,
-      ),
-    );
+    console.log(chalk.green(`\n1. 공격한다 2. 아무것도 하지않는다.`));
     const choice = readlineSync.question('당신의 선택은? ');
 
     // 플레이어의 선택에 따라 다음 행동 처리
     logs.push(chalk.green(`${choice}를 선택하셨습니다.`));
   }
-  
 };
 
 export async function startGame() {
   console.clear();
   const player = new Player();
-  let stage = 1;
+  let day = 1;
 
-  while (stage <= 10) {
-    const monster = new Monster(stage);
-    await battle(stage, player, monster);
+  while (day <= 10) {
+    const monster = new Monster(day);
+    await battle(day, player, monster);
 
     // 스테이지 클리어 및 게임 종료 조건
 
-    stage++;
+    day++;
   }
 }
