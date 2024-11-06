@@ -6,14 +6,15 @@ import { startGame } from './game.js';
 // 로비 화면을 출력하는 함수
 function displayLobby() {
   console.clear();
-
+  console.log(chalk.white(``)); // 크기 테스트 용도
   // 타이틀 텍스트
   console.log(
     chalk.cyan(
-      figlet.textSync('RL- Javascript', {
-        font: 'Standard',
+      figlet.textSync('legend of leaf ', {
+        //font: 'Standard',
         horizontalLayout: 'default',
         verticalLayout: 'default',
+        font: '3-D',
       }),
     ),
   );
@@ -44,12 +45,13 @@ function displayLobby() {
 
 // 유저 입력을 받아 처리하는 함수
 function handleUserInput() {
-  const choice = readlineSync.question('입력: ');
+  const choice = readlineSync.question('ENTER : ');
 
   switch (choice) {
     case '1':
       console.log(chalk.green('게임을 시작합니다.'));
       // 여기에서 새로운 게임 시작 로직을 구현
+      console.clear();
       startGame();
       break;
     case '2':
