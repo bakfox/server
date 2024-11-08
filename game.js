@@ -1,6 +1,9 @@
 import chalk from 'chalk';
 import readlineSync from 'readline-sync';
 
+const { Low, JSONFile } = require('lowdb');
+const path = require('path');
+
 let day = 1; // 날자
 let dayStack = 1; //아침 점심 오후
 
@@ -776,7 +779,21 @@ const adventure = async (player) => {
       return false;
     }
   };
-
+  const randomEventCheck = (value, player) => {
+    // 기본 20퍼 50퍼 50퍼 나머지 실패. 개별 확률 적용
+    //이벤트 확률 적용
+    if (randomMaker(20)) {
+      //스페이셜
+    } else if (randomMaker(50)) {
+      //성공
+      adventureEvent_Succes(player, checkStageCount(value));
+    } else if (randomMaker(50)) {
+      //배틀
+    } else {
+      //실패
+      adventureEvent_Failed(player, checkStageCount(value));
+    }
+  };
   while (true) {
     console.clear();
     changePercent(100);
@@ -794,11 +811,11 @@ const adventure = async (player) => {
         break;
       case 2:
         checkDayCount();
-        adventureEvent_Succes(player, checkStageCount(leftPercent));
+
         break;
       case 3:
         checkDayCount();
-        adventureEvent_Failed(player, checkStageCount(middlePercent));
+
         break;
       case 4:
         return;
@@ -809,6 +826,7 @@ const adventure = async (player) => {
   }
 };
 const adventureEvent_Special = async (player) => {
+  //특별한 이벤트
   while (true) {
     console.clear();
     // 입력값 받아오기
@@ -830,6 +848,7 @@ const adventureEvent_Special = async (player) => {
   }
 };
 const adventureEvent_Succes = async (player, check) => {
+  // 아이템 획득
   let getItemId = 1;
 
   while (true) {
@@ -862,6 +881,7 @@ const adventureEvent_Succes = async (player, check) => {
   }
 };
 const adventureEvent_Battle = async (player, check) => {
+  // 배틀 걸림
   const monster = new Monster();
   while (player._hp > 0) {
     console.clear();
@@ -877,6 +897,7 @@ const adventureEvent_Battle = async (player, check) => {
   }
 };
 const adventureEvent_Failed = async (player, check) => {
+  // 아무것도 못얻음
   while (true) {
     console.clear();
     // 입력값 받아오기
@@ -887,6 +908,7 @@ const adventureEvent_Failed = async (player, check) => {
   }
 };
 const inventory = async (player, change_id = 0, check_change) => {
+  // 인벤토리 기본 판매 교환 순
   let logs = [];
   while (true) {
     switch (playerInventory_Status) {
@@ -971,6 +993,7 @@ const inventory = async (player, change_id = 0, check_change) => {
 };
 
 const status = async (player) => {
+  // 상태 스텟 찍기
   let logs = [];
   console.clear();
   displayStatus(player);
@@ -1021,6 +1044,7 @@ const status = async (player) => {
   }
 };
 const camp = async (player) => {
+  // 휴식
   while (player.hp > 0) {
     console.clear();
     displayCamp(player);
@@ -1041,6 +1065,7 @@ const camp = async (player) => {
   }
 };
 const playerStatusDice = async (dice, player) => {
+  // 처음 주사위 용도
   dice.random();
   while (true) {
     console.clear();
@@ -1063,6 +1088,7 @@ const playerStatusDice = async (dice, player) => {
     }
   }
 };
+// 화면 띄어주기 위한 용도.
 function displayFristDice(dice) {
   console.clear();
   console.log(
@@ -1380,6 +1406,7 @@ function displayCamp(player) {
     ),
   );
 }
+// 어디서나 쓸 함수들
 const checkHaveItem = (value) => {
   //아이템 id값 받음
   // 인벤토리에 있나 체크용도
