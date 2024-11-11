@@ -1,18 +1,52 @@
 import chalk from 'chalk';
 import readlineSync from 'readline-sync';
+import { brotliCompress, brotliDecompress } from 'zlib';
+import {
+  displayCamp,
+  displayDefolt,
+  displayFristDice,
+  displayStatus,
+  displayAdventure_Battle,
+  displayAdventure_Shop,
+  displayAdventure_Failed,
+  displayAdventure_Succes,
+  displayAdventure_Trap,
+  displayAdventure,
+  displayinventory,
+} from './display.js';
+import { log } from 'console';
 
+let maxDay = 100; //최종 날자
 let day = 1; // 날자
 let dayStack = 1; //아침 점심 오후
 
+let maxStage = 3; // 스테이지 맥스
 let stageStack = 1; //스테이지 큰범위 관련 맵 -
 let stageCount = 1; //작은 범위;
-
+let specialEventStatus = 0; // 스페이셜 이벤트
 let battleEnd = true; // 배틀 상태
 
-let playerGold = 0; // 플레이어 관련
+let playerGold = 10000; // 플레이어 관련
 
 const playerAdventureSprit_SpecialEvent = {
-  //1: 덫 2: 상자 3: 상자 보상 4: 상자 미믹
+  //0: 상점 1: 덫 2: 안전하게 탈출 3 : 머리부터 떨어짐 4: 도와주로 옴  5: 상자 6: 상자 보상 7: 상자 미믹
+  0: `
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣄⣤⢤⠤⠦⠶⠲⠶⠲⠒⠓⠓⠛⠛⠚⠓⡓⠓⢶⡄⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠶⠛⠙⠉⠉⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠞⠁⠀  ⠀⣻⡀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠏⠀⠀⠀  ⢸ ⣇⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣟⠀⠀⠀⠀⠀  ⠨⣿⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⡄⠀⠀⠀  ⠀⣸⡟⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡟⣸⢿⡂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣿⣿⣄⠀⢀⣴⡿⠁⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⡶⢿⡸⠿⣤⣦⣴⣴⣦⣶⣶⣶⣶⣶⣶⣶⣶⣶⣷⣿⣿⣿⡿⡿⠿⣿⣿⣷⣿⣿⡄⠀⠀⠀⠀⣀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠃⣿⣇⣽⡷⠓⢿⣭⡟⠉⠉⠉⠉⣈⣩⠽⠻⢭⣍⠉⠉⠈⠀⠀⠀⠀⠀⠘⣿⣿⣿⣿⣿⡀⣠⣴⣞⠉⣗⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡾⠋⣿⣿⡿⣦⣿⠏⣀⢀⡴⠞⠋⠉⠁⠀⠀⠀⠈⠛⠶⣄⣀⠀⠀⠀⠀⢈⡇⠉⠛⣿⣿⣟⠷⣍⣡⣾⣿⣄
+  ⠀⠀⠀⠀⠀⠀⠀⣠⠶⠾⢷⣄⣿⠋⠀⣿⠃⠀⣟⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠳⢦⡄⠀⠀⣯⠀⠀⢸⣿⣿⣀⡾⣹⠏⠉⠉
+  ⠀⠀⠀⠀⠀⠀⠀⠙⢶⢰⡗⢻⡏⠀⣼⠃⠀⣼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣄⠀⠀⢿⠀⠀⢸⡆⠀⠐⣿⣿⡟⢁⣯⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⣹⡎⣧⣿⠀⢰⡇⠀⢰⡇⠀⢀⣠⣄⠀⠀⠀⠀⣀⣀⠀⢠⡀⠀⠹⣆⠀⠈⢷⡀⠀⣷⠀⠀⢹⣿⡷⢿⣿⡆⠀⠀
+  ⠀⠀⠀⠀⠀⢀⡴⢛⡭⠀⠤⣍⢻⡞⠀⠀⣺⡀⢠⣯⡀⠘⣇⢀⣠⡟⠉⠘⢷⠸⡇⠀⠀⠸⡆⠀⠘⣇⠀⢸⡆⠀⢼⡟⢁⣽⣿⡃⠀⠀
+  ⠀⠀⠀⠀⢠⡟⣸⣏⣠⣴⣤⣽⣾⠁⠀⠀⠈⣽⢻⣿⣿⠶⡷⠛⢽⣿⣿⡤⢾⡿⣇⠀⠀⠀⢻⡄⢀⡓⠀⠀⣗⠀⡿⠁⣾⣿⡿⢶⣗⠀
+  ⠀⠀⠀⠀⢸⡇⣿⣿⣿⣿⣿⣿⢇⡴⠛⠙⠳⣿⡞⠻⠷⠖⣩⣤⢸⣿⣿⣅⣬⠧⡗⠀⠀⠀⠈⣧⣸⠷⠳⣦⡗⢰⡏⢸⣿⡟⢠⣿⡗⠀
+`,
   1: `
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣶⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢶⣦⣄⠀⠀⠀⠀⠈⠻⣷⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -54,6 +88,56 @@ const playerAdventureSprit_SpecialEvent = {
 ⠀⠀⠀⠀⠀⠀⠾⠿⠿⠿⠿⠟⠟⠛⠛⠋⠀⠁⠀⠉⠉⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
   2: `
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⡀⡀⠀⠀⠀⠀⠀⠰⢤⡀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠏⠉⡉⡻⠚⠂⠚⠲⠲⠖⠟⠻⠧⠀⠀⠹⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⣿⣏⠙⠙⠛⠲⢦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡧⠀⠀⠀⠀⠀⠈⠛⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣷⣻⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⠛⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⡏⠀⠀⠀⠀⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠠⡗⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⢤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠂⠀⠀⠀⠀⠀⢘⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡾⠉⠀⠀⠙⢷⡄⠀⠀⠀⠀⠀⠀⠀⢠⡗⠀⠀⠆⠀⠀⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡴⠟⢳⡄⠀⠀⠘⣿⣤⠀⠀⠀⠀⣠⣠⡾⠀⠀⢀⡷⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠇⠀⠘⣳⣤⣄⡀⣻⡯⡆⠀⣀⣼⣿⠟⠃⢀⣰⠟⠀⠀⠀⠀⠈⠗⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣁⣄⡼⠋⠁⠉⠋⠹⡦⠷⠞⣿⠟⠉⠀⢠⡞⠁⠀⠀⠀⠀⠀⠢⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠴⠖⠛⠉⣁⡥⢡⡀⠀⠀⢰⠟⠁⠙⣾⠃⠀⠀⢰⠏⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣼⣇⣀⣀⣀⣾⣉⣀⣈⣻⣰⢷⢨⣷⡤⡴⠇⠀⠐⠚⠛⠓⠛⠛⠛⠙⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⠉⠉⠉⠉⠁⠉⠉⠉⠉⠈⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+  3: `
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⡀⡀⠀⠀⠀⠀⠀⠰⢤⡀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠏⠉⡉⡻⠚⠂⠚⠲⠲⠖⠟⠻⠧⠀⠀⠹⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⣿⣏⠙⠙⠛⠲⢦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡧⠀⠀⠀⠀⠀⠈⠛⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣷⣻⠴⢤⣄⠀⠀⠀⠀⠀⠙⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣶⡿⠛⢻⠄⢸⠇⠀⠀⠀⠀⠀⠈⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡶⠛⠉⣉⣬⠷⣠⣿⡤⣿⣤⢿⡇⠀⠀⠀⠀⠀⠘⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣇⠠⢿⠉⡴⠏⠁⠀⠀⠀⠀⣼⠁⠀⠀⠀⠀⠀⠀⢹⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⢻⡀⠘⣿⠃⠀⠀⠀⢀⣠⠾⠁⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⢠⠞⠉⠈⠙⣦⣸⡇⣼⡷⠾⠻⠻⢻⡏⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⢀⡾⠈⠀⠀⡀⢀⠨⣷⡟⠁⠀⠀⠀⠀⣸⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⣧⠀⣯⠈⣯⢿⢸⣗⣇⠀⠀⠀⠀⢀⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⡏⠀⠀⠀⠀⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠸⣆⣯⠀⣿⣶⡾⠛⠋⣷⠀⣀⣠⣰⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠠⡗⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⢸⡟⠚⠋⠁⠀⠀⠀⢸⡏⣩⢷⣽⣿⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⢸⡃⠐⠶⠶⢤⣤⣤⠼⠛⠁⠀⠙⢱⡄⠻⣄⠀⠀⠀⠀⠀⠀⠀⠀⣼⠂⠀⠀⠀⠀⠀⢘⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⢸⡃⠀⠀⠀⠀⢿⣷⠀⠀⠀⠀⠀⢐⣧⠀⠙⣦⠀⠀⠀⠀⠀⠀⢠⡏⠀⠀⠆⠀⠀⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⣽⠀⠀⠀⠀⠀⣾⣷⣄⣀⣀⡀⣀⢞⣙⣷⠴⠞⠀⠀⠀⠀⠀⢀⡿⠀⠀⢀⡷⠀⠀⠀⠨⡇⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⢰⣇⣀⣄⣤⠴⢞⡿⠛⠉⠉⠉⠁⠁⠈⠙⠳⣆⣄⣤⣀⠀⠀⣸⠿⠁⠀⣴⠛⠀⠀⠀⠀⠈⠗⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠈⢹⣿⡏⢰⠟⠀⠀⠀⠀⠀⠀⢀⣠⠴⠆⠉⠀⠀⠉⣳⠞⠉⠀⢠⡾⠁⠀⠀⠀⠀⠀⠢⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⣿⣧⠏⠀⠀⠀⠀⠀⠀⢼⠋⠁⠀⠀⠀⠀⠀⣼⠃⠀⠀⣰⠏⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠻⢻⡆⠀⠀⠀⢀⣀⣀⣟⣀⣰⢷⢠⣤⡤⠶⠇⠀⠐⠲⠛⠚⠓⠛⠛⠙⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠀⠉⠉⠈⠉⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+  4: `
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣠⡴⠎⠁⠁⠀⠀⠸⠶⠚⠋⡗⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣍⠁⢹⡇⠀⠀⠀⠀⠀⠀⠀⣤⡞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -68,7 +152,7 @@ const playerAdventureSprit_SpecialEvent = {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣷⣄⣼⣧⣤⣤⢤⢤⠤⠴⠼⠿⠶⠿⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
-  3: `
+  5: `
 
 ⠀⠀⠀⠀⣴⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣤⣴⣶⣶⣶⣶⣦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠈⠉⠀⠀⠀⢠⣶⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣶⡿⠟⠋⠉⠁⠀⠀⠉⠙⢿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -111,7 +195,7 @@ const playerAdventureSprit_SpecialEvent = {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣷⣀⣀⣀⣼⣿⣄⣄⣄⣄⣤⣤⣤⣤⣤⣤⣴⣤⣦⣮⣿⣿⣿⣿⣷⣾⣿⣧⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⠿⠿⠟⠟⠟⠻⠛⠛⠛⠛⠋⠋⠙⠉⠉⠉⠉⠉⠉⠉⠉⠈⠈⠀⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
-  4: `
+  6: `
 
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣠⣤⣴⣴⣶⣶⣶⣶⣶⣷⣶⣶⣶⣶⣶⣤⣤⣄⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣴⣾⠿⠟⠛⠙⠉⠉⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠋⠛⠛⠀⢴⣦⣄⠀⠀⠀⠀⠀⠀⠀⠀
@@ -230,7 +314,6 @@ const playerAdventureSprit_defoltEvent = {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠛⠿⠷⠶⠶⠶⠾⠿⠛⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
   3: `
-
 ⠀⠀⠀⠀⠀⠀⢀⣠⣤⣴⣶⣶⣶⣶⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⢀⣠⣶⡿⠟⠛⠉⠁⠀⠀⠀⠈⢻⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⢀⣾⠿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -258,7 +341,79 @@ const playerAdventureSprit_defoltEvent = {
 ⠀⢠⣾⠏⠀⣾⣿⡷⡿⠿⠛⠛⠋⠉⡈⣀⣤⣤⣶⣾⠿⠟⠛⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⢠⣿⠏⠀⠀⢀⢁⣀⣠⣤⣶⣶⡿⠿⠟⠛⠋⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠈⠻⠿⠿⠿⠿⠟⠛⠋⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+  4: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠚⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠞⠋⢀⡄⠈⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠛⠁⠀⠀⣸⠇⠀⠘⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠶⠋⠀⠀⠀⠀⢀⡟⠀⠀⠀⢸⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠏⠁⠀⠀⠀⠀⠀⠀⢸⠃⠀⠀⠀⠀⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠅⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡟⠀⠀⠀⠀⠀⠀⢠⡟⠀⠀⠀⠀⢀⡼⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠃⠀⠀⠀⠀⠀⠀⠛⠀⠀⠀⢀⡴⠏⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡏⠀⠀⠀⠀⠀⣰⠆⠀⠀⠀⢠⡞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠁⠀⠀⠀⢀⡾⠃⠀⠀⠀⣴⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡏⠀⠀⠀⣠⠟⠀⠀⠀⢠⡾⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠁⠀⠀⣰⠏⠀⠀⠀⣰⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡇⠀⣀⡼⠃⠀⠀⢀⡾⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠺⢿⣿⣿⣷⡀⠀⣰⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⠿⣷⡼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 
+
+`,
+  5: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣤⣀⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠛⠁⠀⠀⠉⠉⠁⡉⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⠞⠋⠀⠀⠀⠀⠀⠀⣠⣾⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡴⠋⠁⠀⠀⠀⠀⠀⠀⣠⣾⣿⣿⣿⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡴⠞⠁⠀⠀⠀⠀⠀⠀⢀⣰⣾⣿⣿⣿⣿⣿⣿⣿⣿⡧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡤⠞⠉⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠶⠋⠁⠀⠀⠀⠀⠀⠀⠀⣠⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠘⠲⠶⠦⣤⣄⡀⠀⣴⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⠀⠀⠀⠀⠀⠁⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡇⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠷⢦⣄⡀⠀⠀⠀⠀⠀⢽⣿⣿⣿⡿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠓⠷⢤⣀⡀⠸⣿⡿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠚⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+  6: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠖⢶⠏⠀⠙⠷⣄⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣺⠁⠀⠀⠘⠶⣤⣀⡽⠂⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡴⢋⡼⠳⣤⠄⠀⠀⠉⣳⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⠶⠋⣡⠶⠋⠁⢠⡞⠁⣠⠶⠺⠋⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⠴⠞⠋⠁⣠⠄⠘⢶⣄⠀⡾⠁⣼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⠶⠋⠁⢀⣤⠶⠛⠁⠀⠀⠀⠘⣿⡏⠀⡯⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡴⠞⠋⠀⣀⡴⠞⠋⠀⠀⠀⠀⠀⠀⠀⠀⣿⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡴⠞⠉⠀⣠⣴⣾⣏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣟⠀⢸⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣰⠞⠀⢀⣠⣶⣿⣿⣿⢿⣿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⢀⡯⠀⠸⠅⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠏⠀⣠⣶⣿⣿⣿⡟⠁⠉⢿⣿⣿⣿⣿⣷⡆⢀⣲⣶⣶⣒⣶⡇⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠃⠀⣴⣿⣿⣿⣿⣿⣿⣦⣶⣾⣿⣿⣯⣽⣿⣿⣿⡟⠃⠈⢹⣿⡇⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡃⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠻⠿⢿⣿⣿⣄⣄⣼⣿⠇⠀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⠀⢸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⣿⣍⡀⠀⠠⣿⣿⣿⣿⣿⣿⣿⠁⠀⢸⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⣗⠀⢽⣿⣿⣿⣿⣿⣿⡇⠀⠙⠋⣻⣿⣿⣦⣾⣶⣿⣿⣿⣿⣿⣿⡏⠀⠀⣼⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⣷⠀⢸⣿⣿⣿⣿⣿⣥⡀⠀⠀⢘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀⢠⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⡄⠘⢿⣿⣿⣿⣿⣿⣷⣤⣿⣾⣿⣿⣿⣿⣿⣿⣿⢿⣿⣿⣿⠇⠀⠀⣼⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣧⠀⠘⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠀⠉⢉⣿⣿⠋⠀⠀⣰⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢧⡀⠈⠹⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⡄⣀⣸⡿⠃⠀⠀⣴⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠹⣆⡀⠈⠙⠻⢿⣿⡿⠿⠛⣿⣿⣿⣿⣿⡿⠟⠁⠀⣠⠾⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⢀⣀⠀⠈⠀⠀⠀⠘⠙⠉⠁⠁⠀⢀⣤⠞⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠙⠓⠶⠶⠦⠄⠀⠀⠶⠶⠚⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+  7: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡤⠶⠛⠉⠳⢦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠶⠋⠁⠀⠀⠀⠀⠀⠀⠉⣳⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡼⠃⠲⠦⣤⣀⡀⡀⢀⣠⣴⣾⣿⣿⣿⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⠶⣺⠏⠀⠀⠀⠀⠀⠉⠉⢋⡿⠟⠋⠉⠉⠉⠻⢿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠾⡧⢴⢤⣄⠀⠀⠀⠀⢀⡞⠁⠀⠀⠀⠀⠀⠀⠈⢹⡗⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡿⠶⠴⢤⠴⣼⣷⠀⠀⠀⢸⣷⣾⣶⣶⣄⠀⠀⠀⠀⠀⢻⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⢦⡀⠀⠀⠀⠙⠃⠀⠀⠈⠉⠈⢈⣿⣿⣷⣦⣀⣀⣤⠀⢹⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⢀⣤⠾⢿⣿⣿⣿⣿⣿⣿⣧⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡷⢴⣄⣄⣤⠴⠞⢋⣤⣾⣿⣿⣿⣿⣿⣿⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⡀⠀⠀⢀⣠⣾⣿⣿⣿⣿⣿⣿⠿⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠛⠛⠉⠁⠉⠉⠙⠙⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
 };
 const playerAdventureSprit_AM = {
@@ -375,6 +530,7 @@ const playerAdventureSprit_PM = {
    ⠀⠀⠀⠀⢼⡏⠛⣧⠀⠀⠈⢳⣤⡟⠀⠀⠀⠀⢸⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣤⠶⠋⠀⠀⣿⠀⠀⠀⠀⠀⠀
     `,
 };
+
 let checkInventoryChange = false; //변경후 체크용도
 let playerInventory_Status = 0; //기본 상태 : 0 그냥 확인용도 1 : 판매 2 : 교체 ;
 let playerInventory = {
@@ -443,8 +599,8 @@ const itemData = {
   ],
   7: [
     1200,
-    '보석 물고기',
-    '반짝이는 몸이 아름다운 물고기입니다. 약 제조에 사용됩니다. ',
+    '골렘의 심장',
+    '반짝이는 골렘의 보석 입니다. 왜 여기 있을까요? 약 제조에 사용됩니다. ',
     null,
   ],
 };
@@ -505,8 +661,8 @@ class Player {
     this._str = 0;
     this._dex = 0;
     this._playerSkillPoint = 0; //스킬 포인트
-    this.dotSprit = {
-      atck: `
+    this._dotSprit = {
+      1: `
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣦⣀⠀⠀⠀⠀⠀⠀⢀⣠⠀⠀⠀⠀⠀  ⠀⠀⣀⡴⠞⢷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⠀⡉⠳⢦⣀⠀⠀⢠⡞⠿⠖⠲⠶⢆⣠⣴⠛⠉⣰⠄⣹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡀⠻⣄⠀⠉⠻⠷⠋⠀⠀⠀⠀⠀⠈⠉⠈⠛⢶⡋⢠⡞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⣀⠀⠀
@@ -527,7 +683,7 @@ class Player {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢧⠀⠀⠀⠀⠀⠀⡿⠀⠀⠀⠀⠀⠙⠷⣄⠀⠀⠀⣠⣾⣿⣯⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢳⣄⠀⠀⠀⢸⠇⠀⠀⠀⠀⠀⠀⠀⠈⠛⠖⠟⢹⣿⡏⢸⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
-      hit: `
+      2: `
    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣤⡀⠤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⢰⠟⢾⡆⠀⠀⠀⠀ ⢀⣶⣶⣂⣀⡀⠀⠀⢀⣀⡤⠶⠛⠉⢸⣏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⡿⢀⡌⠙⢶⣶⠘⢀⡞⠙⠉⠁⠉⠙⠚⠚⠻⢧⣄⣠⠾⠁⣽⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -545,10 +701,10 @@ class Player {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⡟⠁⠀⠀⠈⠉⠉⠉⠁⠀⣿⣿⡟⠻⣷⣷⣆⡾⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠏⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠫⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⡶⠛⠉⠙⠋⢷⣄⡀⠀⠀⠀⠀⠀⠀⣠⠾⠁⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠇⠀⠈⢻⡗⠶⢤⢤⣶⣆⣤⢴⣾⣛⠀⠀⠀⠀⠀⠈⠹⣟⠶⢦⣀⣀⣤⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⡁⠀⠀⠀⢻⡄⠀⠀⠀⠀⠀⠀⠈⠉⠳⣷⡗⠘⠀⠀⠀⠙⣦⣄⡉⡉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⣹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠈⢳⣄⠀⠀⠀⠀⠘⢿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⡁⠀⠀⠀⢻⡄⠀⠀⠀⠀⠀⠀⠈⠉⠳⣷⡗⠘⠀  ⠀⠀⠙⣦⣄⡉⡉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⣹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠈⢳⣄⠀⠀     ⠀⠘⢿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
-      defend: `
+      3: `
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣦⣀⠀⠀⠀⠀ ⠀⠀⠀⣄⠀⠀⠀⠀⠀⠀⠀⣀⡴⠞⢯⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣽⠀⡉⠳⢦⣀⠀⠀⢠⡞⠿⠖⠳⠲⣆⣠⣴⠛⠉⣠⠆⣹⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡀⠻⣄⠀⠉⠻⠷⠋⠀⠀⠀⠀⠀⠈⠈⠉⠛⢶⡋⢠⡞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -567,39 +723,76 @@ class Player {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡾⠙⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣺⠀⠀⠀⠀⢀⣼⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠷⣄⣀⣰⠏⠙⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠳⣤⣠⡴⠖⠛⠉⠋⠋⠛⠓⠛⠁⠀⠈⠉⠀⠀⠀⠈⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   ⠀⠀⠻⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+      4: `
+      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣀⣀⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠀⠀⠀⣠⡴⠞⠋⠁⠉⠈⠈⠉⠉⠁⠹⣆⠀⠀⠀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⣀⣀⡴⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡿⣀⡴⠞⠉⠈⠉⠛⠦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⣶⠋⣻⡿⠁⠀⠀⠀⢀⣀⣀⣄⣠⣀⣀⡀⣼⠟⠉⠀⠀⠀⣠⠶⠚⠛⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⢸⣆⣿⠇⠀⣠⡴⠞⠋⠉⠀⠀⠀⠈⠉⠉⠛⠲⢦⣀⣠⠾⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⢸⣽⣿⣠⣾⠏⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⢻⡄⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⣿⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠀⠀⠀⠀⠀⣰⠏⣁⡙⢷⡀⠀⠀⠀⠀⠀⣰⠖⠓⠲⢦⡀⠀⠀⠀
+      ⠀⠀⠀⠀⢽⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⢀⣯⣀⠀⠀⠀⠀⠸⣇⡻⠴⠾⠁⢀⣠⣤⠀⠐⣇⠰⣏⠛⢀⣻⠀⠀⠀
+      ⠀⠀⠀⠀⢸⡿⠀⠀⠀⠀⠀⠀⢀⣀⡀⠠⠶⠶⠺⠚⠛⠉⠀⠈⠁⠉⢷⡀⠀⠀⠀⠈⠀⠀⠀⠀⠘⠁⠸⠀⠀⠘⠃⠙⠓⠋⠁⠀⠀⠀
+      ⠀⠀⠀⠀⢸⠇⠀⠀⠀⢀⣰⠖⠋⠁⠀⠀⠀⠀⠀⠀⠀⣠⠶⠳⢦⠀⠘⣷⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠸⣇⡀⠀⠀⢸⡅⠀⠀⢀⣶⡆⠀⣤⠶⠖⠀⠀⠀⠀⠀⠰⢦⣿⠙⢦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠈⠙⠖⣶⣿⠀⠀⢀⣾⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⠉⠳⢦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠀⠀⣸⣿⡏⠀⢀⣾⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠈⢷⡀⠀⠉⠳⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠀⢠⡏⢻⣷⣄⣸⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⢻⡄⠀⠀⠀⣻⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⢠⡟⠀⠀⠙⢿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠁⠀⠀⢹⡤⠴⠞⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⢀⡾⠀⠀⠀⠀⠈⢻⣿⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⢁⢀⢀⣀⣰⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠸⣇⠀⠀⠀⠀⠀⠀⢻⣿⠿⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠉⠈⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠙⠳⣄⡀⢀⣀⣤⢼⡟⠀⠀⠙⠶⢶⣤⣤⣤⢤⠶⠚⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠀⠀⠈⠙⠉⠁⠀⠸⣇⣀⣠⡤⠞⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+      
 `,
     };
   }
   get hp() {
-    let temp = parseInt(this._hp * this._hpPercent);
-    return temp;
+    return parseInt(this._hp * this._hpPercent);
   }
   set hp(value) {
     // 데미지 받으면 음수로 집어넣기
-    let temp = parseInt((this.hp + value) / this._hp);
+    let temp = (this.hp + value) / this._hp;
     if (temp >= 1) {
-      temp = 1;
+      this._hpPercent = 1; // HP가 최대일 때
+    } else if (temp <= 0) {
+      this._hpPercent = 0; // HP가 0 이하일 때
+    } else {
+      this._hpPercent = temp;
     }
-    this._hpPercent = temp;
   }
-  level_up() {
-    this._level++;
-    this._playerSkillPoint += 5;
-    this._exp = this._exp - this._levelUpExp;
-    this._hp += parseInt((this._str / 5) * 10 + 10);
-    this._atck += parseInt((this._str * 5) / 10 + 1); // 기본 1올라감 힘비례 해서 강해짐
+  level_Up(value) {
+    this._exp += value;
+    if (this._exp >= this._levelUpExp) {
+      this._level++;
+      this._playerSkillPoint += 2;
+      this._exp = this._exp - this._levelUpExp;
+      this._hp += parseInt((this._str / 5) * 10 + 10);
+      this._atck += parseInt((this._str * 5) / 10 + 1); // 기본 1올라감 힘비례 해서 강해짐
+    }
   }
 }
 
 class Monster {
   //몬스터 데이터
   constructor() {
-    this._hp = 100;
+    this._hp = 10;
     this._atck = 1;
     this._exp = 40;
+    this._gold = 50;
     this._firstCheck = true;
-    this.dotSprit = {
+    this._name = {
+      1: '슬라임',
+      2: '화난 꽃',
+      3: '타락한 골렘',
+      4: '화난 불의 정령',
+      5: '물의 정령',
+      6: '공격하는 바람의 정령',
+    };
+    this._dotSprit = {
       1: `
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⠶⠶⠷⢶⣦⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⡟⠋⠀⠀⠀⠀⠀⠀⠉⠛⠻⢶⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -647,11 +840,11 @@ class Monster {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡿⠀⠀⠀⠀⣰⣿⠃⠀⠈⠉⠛⠻⠿⠿⠿⠟⠛⠉⠀⠀⠀⠾⣿⡿⢷⣶⣤⣴⣶⠿⠛⠁⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠠⣿⡃⠀⠀⠀⢠⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣷⠀⠀⠀⠀⠀⠹⣿⡀⠀⠉⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠨⣿⡂⠀⠀⠀⠻⠇⠀⠀⠀⠀⢺⣷⠀⠀⠀⠀⠀⠿⠇⠀⠀⠀⠀⠨⣿⡂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⣽⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡿⠀⠀⠀⠀⢀⣠⣶⠿⢿⣶⣄⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣿⣄⠀⠀⠀⠀⠀⠀⣀⣼⡿⠙⣿⣿⣦⡀⠀⠀⠀⠀⣀⣤⣾⠟⠁⠀⠀⠀⣠⣾⠟⠁⠀⠀⠈⠻⣷⡄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⣽⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⡿⠀⠀  ⠀⠀⢀⣠⣶⠿⢿⣶⣄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣿⣄⠀⠀⠀⠀⠀⠀⣀⣼⡿⠙⣿⣿⣦⡀⠀⠀⠀⠀⣀⣤⣾⠟⠁⠀⠀⠀ ⣠⣾⠟⠁⠀⠀⠈⠻⣷⡄⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠻⣷⣶⣴⣴⣶⠿⠟⠋⠀⠀⢽⡯⠙⢿⣶⣴⣶⣿⠟⢻⣷⣤⣀⠀⢀⣾⡟⠁⠀⠀⠀⠀⠀⠀⠙⣿⡄⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠁⠀⠀⠀⠀⠀⠀⣺⡯⠀⠀⠀⠀⣺⣿⣤⣀⠈⠙⠛⠿⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⠃⠀⠀⢀⣴⡿⠃⠙⠻⢷⣦⣄⠀⠀⠀⢠⣦⣴⣾⣄⠀⣀⡀⣀⡀⣿⡇
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠁⠀⠀⠀⠀⠀⠀⣺⡯⠀⠀⠀⠀⣺⣿⣤⣀⠈⠙⠛⠿⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀   ⠀⢹⣿⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⠃⠀⠀⢀⣴⡿⠃⠙⠻⢷⣦⣄⠀⠀⠀⢠⣦⣴⣾⣄⠀⣀⡀⣀ ⡀⣿⡇
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⡟⠁⠀⢀⣰⣾⠏⠁⠀⠀⠀⠀⠉⣿⡇⠀⠀⣾⣿⣿⣿⣿⣶⣿⣿⡟⢿⢿⠇
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⣿⠋⠀⠀⣤⣿⠏⠁⠀⠀⠀⠀⠀⠀⠀⢿⡇⠀⠀⠙⢿⣿⣿⣿⣿⣿⣿⣿⣆⡀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⡟⠁⠀⣠⣿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣿⡄⠀⠀⠀⠙⠿⠿⠟⠛⠛⠉⣿⡇⠀
@@ -659,26 +852,113 @@ class Monster {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣿⠀⠀⠀⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠙⠛⠛⠙⠉⠉⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⣷⠀⠀⠀⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 `,
+      3: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣶⣾⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠞⠋⠈⠙⢦⡀⠀⠀⠀⢰⣾⣿⣿⣿⣿⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣶⣶⣶⣿⣶⠀⠀⠀⠀⠀⢀⡴⠞⠁⠀⠀⣶⠀⠈⠹⣄⠀⠀⠀⠛⠿⢿⠿⢿⣿⣿⣿⡧⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⣶⣿⣿⣿⡿⠏⠀⠀⢀⣠⠞⠋⠀⠀⠀⠀⢠⡇⠀⠀⠀⠙⢧⡀⠀⠀⠀⠀⠀⠀⣿⣿⣿⠇⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⢻⣿⡿⠁⠀⣀⡴⠋⠁⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠈⢳⡶⠶⣤⡀⠀⢀⣿⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢿⣿⣄⠾⠉⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⡅⠀⠀⠀⠀⠀⣀⣷⠆⠀⢻⣶⣿⠟⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢻⡿⠀⠀⠀⣀⣀⢀⣀⣠⡴⠾⢿⣿⣿⣶⡄⠀⢠⡞⠉⠀⠀⠀⣾⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠇⠀⠀⠀⠈⠉⣿⡿⠉⠀⠀⠀⠙⣿⣿⣿⣤⡾⢀⣠⣶⣦⡞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠁⠀⠀⠀⠀⢀⣿⡇⣰⣆⠀⠀⠀⢸⣿⣿⡟⠙⠉⠁⣾⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡇⠀⠀⠀⠀⠀⢸⣿⣷⡈⠿⠀⠀⠀⢐⣿⠟⠀⠀⠀⠀⠹⣷⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡃⠀⠶⢓⣃⠀⠈⢻⣿⣧⣀⠀⠀⣀⡼⠿⠆⠰⠶⠶⠄⣴⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⣶⣾⣫⠽⠃⠀⠀⢈⡛⠛⢻⣿⠋⠀⠀⠀⠀⠀⠀⢀⣹⠿⠉⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⣿⣆⠀⠀⣀⡶⠀⠀⠀⢸⡿⠀⠀⠀⠀⢀⣠⠶⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⣦⠐⠋⠀⠀⠀⠀⢸⡗⠀⠀⣠⡴⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣷⡶⢤⣤⣠⣀⣸⣿⣰⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡷⠀⠀⠀⠉⠉⢻⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠀⠀⠀⠀⠀⠸⢿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+      4: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⢶⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡟⠀⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠃⠀⠀⢸⡆⣀⣀⠀⠀⠀⠀⠀⠀⠀⣀⡴⠛⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡼⠃⠀⠀⠀⠐⢟⣽⠿⠲⠶⠶⠲⠖⠖⠛⠉⠀⠀⢹⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡞⠁⠀⠀⠀⠀⠀⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡼⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⣻⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠏⠀⠀⣠⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⠾⢻⣀⡴⢶⠄⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠏⠀⠀⠀⢰⡏⢻⡀⠀⢀⣄⠀⠀⣠⡴⠛⠉⠀⠀⢸⡟⢁⡟⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠁⠀⠀⠀⣠⠟⠀⠸⡧⠶⠏⠛⠋⠋⠁⢀⡀⣄⠀⠀⢸⠅⠀⢳⡄⠀⠀⢸⠇⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡞⠁⠀⠀⢀⡴⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢛⣁⢉⡥⠀⠀⠀⠀⠀⣻⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡞⠁⠀⠀⣠⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⡀⠉⠙⠀⠁⠀⠀⢀⣠⡴⠞⠀⠀⢼⠂⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⡾⠀⠀⠀⣰⠏⠀⠀⠀⣀⡀⠀⠀⠀⠀⣰⣿⣿⣷⡀⠀⠀⠀⠀⢰⡏⠁⠀⠀⠀⢀⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⣟⠀⠀⠀⣼⣿⣿⡀⠀⠀⠀⢸⣿⣿⣿⡇⠀⠀⠀⠀⠸⡇⠀⠀⠀⠀⣸⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢼⠀⠀⠀⠀⢻⡀⠀⠀⢺⣿⣿⡇⢠⣤⡀⠸⣿⣿⣿⡇⠀⠀⠀⢀⡼⠃⠀⠀⠀⢰⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢹⡀⠀⠀⠀⠈⣧⠀⠀⠘⢿⣿⠇⠘⠈⠃⠀⠈⠛⠋⠁⠀⠀⠰⢯⡁⠀⠀⠀⣰⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠸⡇⠀⠀⠀⠀⠙⢷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⡀⡀⣀⣠⡟⠀⢀⡼⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣆⠀⠀⠀⠀⠀⠘⠷⣄⡀⠀⠀⠀⢀⣀⣤⠶⠋⠉⠉⠉⠉⠁⠀⢠⡞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⡀⠀⠀⠀⠀⠀⠈⠉⠛⠛⠛⠉⠁⠀⠀⠀⠀⠀⠀⠀⢀⡴⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠹⣄⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡴⠏⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⡴⠏⠳⣤⣀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣤⠶⠟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠙⠓⠶⠶⠲⠖⠛⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
+      5: `
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡤⣬⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⠦⡼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠞⠛⠛⠶⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡞⠁⠀⣰⠦⣆⠙⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡅⠀⣠⣜⢟⠉⠀⠈⠹⣆⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠀⠀⢷⣉⡉⠳⣆⠀⠀⠈⢳⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⠞⠁⠀⢀⣤⣈⠻⣄⠸⡇⠀⠀⠐⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⠞⠃⠀⠀⠀⣼⠂⠙⣦⠹⡮⠇⠀⠀⠀⢹⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣤⠶⠚⠋⠁⠀⠀⢀⣠⠾⠁⠀⠀⠸⣆⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡴⠚⠋⠉⠈⠁⠀⠀⡀⣀⣠⡤⠶⠋⠁⠀⠀⠀⠀⠀⢹⡄⠀⠀⠀⠀⢸⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠞⠁⠀⢀⡴⠖⠗⠛⠙⠙⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⣸⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⢀⡼⠃⠀⠀⣰⠏⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡂⠀⠀⠀⢀⡾⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⢸⡃⠀⠀⢀⡏⠀⠀⣴⡟⠀⠀⠀⣠⡶⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⣽⠀⠀⠀⢀⡼⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠐⣇⠀⠀⢿⡗⠀⠀⢐⣿⣗⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠃⠀⠀⢠⡟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠨⡇⠀⠀⠀⢻⠀⠀⠉⠁⠚⠶⠐⣿⡟⠀⠀⠀⠀⠀⠀⠀⣠⠾⠁⠀⠀⣠⠟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡀⠀⠀⠀⠒⣀⠀⠀⠀⠀⠀⠀⠁⠀⠀⠀⠀⢀⣤⠞⠋⠀⠀⢠⡞⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⠶⣤⡀⠀⠉⠳⢦⣄⣀⡀⡀⠀⡀⣀⣤⠶⠋⠂⠀⠀⢀⡼⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠶⣄⡀⠀⠀⠉⠉⠙⠙⠉⠉⠀⠀⠀⢀⣤⠞⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠶⣤⣄⣀⣀⣀⣀⣠⣠⠴⠞⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠉⠉⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+
+      
+`,
+      6: `
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡴⠞⠁⢺⡂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⠶⠋⠀⠀⢀⡾⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⡴⠚⠉⠀⠀⠀⠀⢀⡼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡤⠞⠋⠁⠀⠀⠀⠀⠀⢀⣠⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠉⠀⢀⣠⣠⣠⣠⣀⠀⣐⣿⣧⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢼⡁⠀⠀⢷⡈⠀⠀⠀⠉⠓⢿⣿⠇⠙⢧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣧⠀⠀⠈⠓⠀⠀⠀⠀⠀⠈⢳⡄⠀⣸⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡟⠳⣄⠀⠀⠀⠀⢠⣦⠀⠀⠨⣧⣼⣣⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⡧⠀⠀⣺⣧⠀⠀⢸⣿⡇⣄⣤⣿⡿⠋⠹⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⡆⠀⠘⠟⠘⠛⠀⢛⣃⢀⠀⠁⠀⠀⠀⢹⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠙⣿⣦⡀⠀⠀⠀⢀⣈⣿⣿⠟⠀⠀⠀⢀⠝⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣇⠋⠉⠛⣿⣿⣷⣿⡿⠟⠋⠁⠀⠀⢀⡴⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⢦⣼⠃⠛⠉⠀⠀⠀⠀⣀⣤⣾⣿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠆⠀⠀⢀⡀⠛⠻⠛⠛⠉⣉⣁⡽⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣽⡀⠀⠀⠈⠉⠛⠖⠶⠶⠶⠈⢙⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣰⠞⣫⣽⣿⣶⣤⣀⠀⠀⠀⠀⠀⠀⠀⣰⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢽⡸⣿⣿⣿⣿⢿⣿⣿⣷⣶⣶⡄⣠⣶⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢨⡟⠩⣭⣼⣶⣿⣿⣿⣿⢿⣫⣾⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+`,
     };
   }
   get hp() {
     if (this._firstCheck) {
       this._firstCheck = false;
-      this._hp += (this._hp / 10) * day;
-    } else return this._hp;
+      this._hp += parseInt(10 * day * stageStack);
+      this._atck += parseInt((day / 2) * stageStack);
+    }
+    return this._hp;
   }
   set hp(value) {
-    this._hp = value;
+    this._hp += value;
   }
-  drop_item() {
-    // 몬스터의 아이템 드랍
+  get gold() {
+    let reward = parseInt(this._gold * day * stageStack);
+    return reward;
   }
-  attack() {
-    // 몬스터의 공격
-  }
-  die() {
-    if (this._hp <= 0) {
-    }
+  set gold(value) {
+    this._gold += value;
   }
 }
 
@@ -687,13 +967,17 @@ export async function startGame() {
   const player = new Player();
   const dice = new Dice();
   await playerStatusDice(dice, player);
-  while (day <= 100) {
+  while (day <= maxDay) {
     while (true) {
       // 입력값 받아오기
       console.clear();
-      displayDefolt(player);
+      displayDefolt(player, day, dayName[dayStack], dayStack, playerGold);
       console.log(
-        chalk.green(`\n1. 인벤토리 2. 숲속으로 떠니기 3. 상태확인 4. 휴식`),
+        player.hp != 0
+          ? chalk.green(`\n1. 인벤토리 2. 숲속으로 떠니기 3. 상태확인 4. 휴식`)
+          : chalk.green(
+              `\n1. 인벤토리 2. 숲속으로 떠니기 ( HP : 0 입장 불가 ) 3. 상태확인 4. 휴식`,
+            ),
       );
       const choice = readlineSync.question(`choose_number : `);
       switch (parseInt(choice)) {
@@ -702,7 +986,9 @@ export async function startGame() {
           await inventory(player);
           break;
         case 2:
-          await adventure(player);
+          if (player.hp != 0) {
+            await adventure(player);
+          }
           break;
         case 3:
           await status(player);
@@ -757,7 +1043,7 @@ const adventure = async (player) => {
     if (randomMaker(value)) {
       // 성공
       stageCount++;
-      if (stageCount > stageMaxCount) {
+      if (stageCount > stageMaxCount && maxStage > stageStack) {
         stageStack++;
         stageCount = 1;
       }
@@ -776,29 +1062,62 @@ const adventure = async (player) => {
       return false;
     }
   };
-
+  const randomEventCheck = (value, player) => {
+    // 기본 20퍼 50퍼 50퍼 나머지 실패. 개별 확률 적용
+    //이벤트 확률 적용
+    if (randomMaker(20)) {
+      //스페이셜
+      adventureEvent_Special(player, checkStageCount(value));
+    } else if (randomMaker(50)) {
+      //성공
+      adventureEvent_Succes(player, checkStageCount(value));
+    } else if (randomMaker(50)) {
+      adventureEvent_Battle(player, checkStageCount(value));
+    } else {
+      //실패
+      adventureEvent_Failed(player, checkStageCount(value));
+    }
+  };
   while (true) {
     console.clear();
     changePercent(100);
-    displayAdventure(player);
+    displayAdventure(
+      player,
+      stageName,
+      stageStack,
+      playerAdventureSprit_AM,
+      playerAdventureSprit_PM,
+      dayName,
+      dayStack,
+      day,
+      stageCount,
+    );
     console.log(
       chalk.green(
-        `\n1.오른쪽으로 이동 ${rightPercent}% 2.왼쪽으로 이동 ${leftPercent}% 3.앞쪽으로 이동 ${middlePercent}% 4. 베이스켐프로 돌아가기 `,
+        `\n1.오른쪽으로 이동 ${rightPercent}% 2.왼쪽으로 이동 ${leftPercent}% 3.앞쪽으로 이동 ${middlePercent}% 4. 베이스켐프로 돌아가기`,
       ),
     );
+    player.hp == 0
+      ? console.log(chalk.redBright(`( hp : 0 이면 진행 불가 휴식 해주세요. )`))
+      : console.log();
     const choice = readlineSync.question(`choose_number : `);
     switch (parseInt(choice)) {
       case 1:
-        checkDayCount();
-        checkStageCount(rightPercent);
+        if (player.hp != 0) {
+          checkDayCount();
+          randomEventCheck(rightPercent, player);
+        }
         break;
       case 2:
-        checkDayCount();
-        adventureEvent_Succes(player, checkStageCount(leftPercent));
+        if (player.hp != 0) {
+          checkDayCount();
+          randomEventCheck(leftPercent, player);
+        }
         break;
       case 3:
-        checkDayCount();
-        adventureEvent_Failed(player, checkStageCount(middlePercent));
+        if (player.hp != 0) {
+          randomEventCheck(middlePercent, player);
+        }
         break;
       case 4:
         return;
@@ -808,34 +1127,285 @@ const adventure = async (player) => {
     }
   }
 };
-const adventureEvent_Special = async (player) => {
-  while (true) {
-    console.clear();
-    // 입력값 받아오기
-    displayFristDice(dice);
-    console.log(chalk.green(`\n1.선택 2.다시 `));
-    const choice = readlineSync.question(`choose_number : `);
-    switch (parseInt(choice)) {
-      case 1:
-        player._luck = dice._luck;
-        player._str = dice._str;
-        player._dex = dice._dex;
-        return;
-      case 2:
-        break;
-      default:
-        console.log(chalk.green(`다시 입력해주세요.`));
-        break;
+const adventureEvent_Special = async (player, check) => {
+  //상점,덫,상자 이벤트
+  const randomEventSpecial = function () {
+    if (randomMaker(20)) {
+      specialEventStatus = 1; // 덫 이벤트
+    } else if (randomMaker(20)) {
+      specialEventStatus = 2; // 상자 이벤트
+    } else {
+      specialEventStatus = 0; // 상점 이벤트.
     }
+  };
+  randomEventSpecial();
+  const shop = (player) => {
+    //상점
+    while (true) {
+      console.clear();
+      // 입력값 받아오기
+      displayAdventure_Shop(
+        true,
+        stageName[stageStack],
+        playerAdventureSprit_SpecialEvent,
+        playerGold,
+      );
+      console.log(chalk.green(`\n1.구매 2.판매 3.나가기 `));
+      const choice = readlineSync.question(`choose_number : `);
+      switch (parseInt(choice)) {
+        case 1:
+          console.clear();
+          // 입력값 받아오기
+          displayAdventure_Shop(
+            false,
+            stageName[stageStack],
+            playerAdventureSprit_SpecialEvent,
+            playerGold,
+          ); //구매창
+          console.log(chalk.green(`\n 원하는 물건 숫자 입력 5.나가기 `));
+          const choice_in = readlineSync.question(`choose_number : `);
+          switch (parseInt(choice_in)) {
+            case 1: // 힘 알약 1200
+              if (playerGold >= 1200) {
+                let i = parseInt(Math.random() * 10);
+                randomMaker(50 + parseInt(player._luck / 4)) ? i : -i;
+                player._str += i;
+                playerGold -= 1200;
+              }
+              break;
+            case 2: // 럭 알약 1200
+              if (playerGold >= 1200) {
+                let i = parseInt(Math.random() * 10);
+                randomMaker(50 + parseInt(player._luck / 4)) ? i : -i;
+                player._luck += i;
+                playerGold -= 1200;
+              }
+              break;
+
+            case 3: // 덱 알약 1200
+              if (playerGold >= 1200) {
+                let i = parseInt(Math.random() * 10);
+                randomMaker(50 + parseInt(player._luck / 4)) ? i : -i;
+                player._dex += i;
+                playerGold -= 1200;
+              }
+              break;
+            case 4: // 물약 1000원
+              if (playerGold >= 1000) {
+                playerGold -= 1000;
+                player.hp = 20;
+              }
+              break;
+            default:
+              break;
+          }
+          break;
+        case 2:
+          playerInventory_Status = 1;
+          inventory(player);
+          break;
+        case 3:
+          return;
+        default:
+          break;
+      }
+    }
+  };
+  const trap = (player) => {
+    //덫
+    while (true) {
+      console.clear();
+      // 입력값 받아오기
+      displayAdventure_Trap(
+        ` 이런! 함정에 걸리셨습니다!`,
+        1,
+        player,
+        stageName[stageStack],
+        playerAdventureSprit_SpecialEvent,
+      );
+      console.log(
+        chalk.green(
+          `\n1. 유연하게 빠져나가기.( DEX 40이상 ) 2. 탈출 시도. 3. 도와줄 사람 기다리기. 실패시 하루소모 ( LUCK 비례 )`,
+        ),
+      );
+      const choice = readlineSync.question(`choose_number : `);
+      switch (parseInt(choice)) {
+        case 1:
+          if (player._dex >= 40) {
+            displayAdventure_Trap(
+              ` 완벽하게 탈출하셨습니다! `,
+              2,
+              player,
+              stageName[stageStack],
+              playerAdventureSprit_SpecialEvent,
+            );
+            const choice = readlineSync.question(
+              `nice! Please type in any key `,
+            );
+            return;
+          }
+          break;
+        case 2:
+          displayAdventure_Trap(
+            ` 밧줄이 오래돼서 그대로 떨어지셨습니다. -${parseInt(
+              50 - (player._dex >= 50 ? 50 : player._dex),
+            )} hp `,
+            2,
+            player,
+            stageName[stageStack],
+            playerAdventureSprit_SpecialEvent,
+          );
+          const choice = readlineSync.question(` Please type in any key `);
+          player.hp = -parseInt(50 - (player._dex >= 50 ? 50 : player._dex));
+          return;
+        case 3: //도와줄 사람 있으면 탈출
+          if (randomMaker(40 + parseInt(50 / player._luck))) {
+            displayAdventure_Trap(
+              ` 다행히 주변에 도와줄 사람이 있었습니다. `,
+              3,
+              player,
+              stageName[stageStack],
+              playerAdventureSprit_SpecialEvent,
+            );
+            const choice = readlineSync.question(` Please type in any key `);
+          } else {
+            displayAdventure_Trap(
+              ` 하루가 지나자 밧줄이 오래돼서 그대로 떨어지셨습니다. - ${parseInt(
+                50 - (player._dex >= 50 ? 50 : player._dex),
+              )} hp `,
+              2,
+              player,
+              stageName[stageStack],
+              playerAdventureSprit_SpecialEvent,
+            );
+            const choice = readlineSync.question(` Please type in any key `);
+            player.hp = -parseInt(50 - (player._dex >= 50 ? 50 : player._dex));
+            day >= maxDay ? (day = 100) : day++;
+            return;
+          }
+          return;
+        default:
+          break;
+      }
+    }
+  };
+  const chest = (player) => {
+    while (true) {
+      console.clear();
+      // 입력값 받아오기
+      displayAdventure_Trap(
+        ` 커다란 보물상자를 찾으셨습니다! `,
+        4,
+        player,
+        stageName[stageStack],
+        playerAdventureSprit_SpecialEvent,
+      );
+      console.log(chalk.green(`\n1. 상자를 연다 2. 무시한다. `));
+      const choice = readlineSync.question(`choose_number : `);
+      switch (parseInt(choice)) {
+        case 1:
+          if (randomMaker(20 + player._luck * 1.25)) {
+            displayAdventure_Trap(
+              ` 엄청난 보상이에요 !. ${
+                2000 * parseInt(player._luck / 10) == 0
+                  ? 200
+                  : 2000 * parseInt(player._luck / 10)
+              } G `,
+              5,
+              player,
+              stageName[stageStack],
+              playerAdventureSprit_SpecialEvent,
+            );
+            const choice_sub = readlineSync.question(
+              ` Please type in any key `,
+            );
+            playerGold +=
+              2000 * parseInt(player._luck / 10) == 0
+                ? 200
+                : 2000 * parseInt(player._luck / 10);
+            return;
+          } else {
+            displayAdventure_Trap(
+              ` 이런 커다란 미믹이였습니다!. -${parseInt(
+                70 - (player._dex >= 70 ? 70 : player._dex),
+              )} hp `,
+              6,
+              player,
+              stageName[stageStack],
+              playerAdventureSprit_SpecialEvent,
+            );
+            const choice_sub = readlineSync.question(
+              ` Please type in any key `,
+            );
+            player.hp = -parseInt(70 - (player._dex >= 70 ? 70 : player._dex));
+            return;
+          }
+          break;
+        case 2:
+          return;
+        default:
+          break;
+      }
+    }
+  };
+  //특별한 이벤트
+  switch (specialEventStatus) {
+    case 0:
+      await shop(player);
+      break;
+    case 1:
+      await trap(player);
+      break;
+    case 2:
+      await chest(player);
+      break;
+    default: // 상점
+      break;
   }
 };
 const adventureEvent_Succes = async (player, check) => {
-  let getItemId = 1;
+  // 아이템 획득
+  let getItemId = 0;
+  const checkStageAccount = () => {
+    switch (stageStack) {
+      case 1:
+        if (randomMaker(60)) {
+          getItemId = 1;
+        } else if (randomMaker(40)) {
+          getItemId = 2;
+        } else {
+          getItemId = 3;
+        }
+        break;
+      case 2:
+        if (randomMaker(60)) {
+          getItemId = 4;
+        } else {
+          getItemId = 5;
+        }
+        break;
+      case 3:
+        if (randomMaker(60)) {
+          getItemId = 6;
+        } else {
+          getItemId = 7;
+        }
+        break;
+    }
+  };
+  checkStageAccount();
+  // 아이템 획득
 
   while (true) {
     console.clear();
     // 입력값 받아오기
-    displayAdventure_Succes(check, getItemId);
+    displayAdventure_Succes(
+      check,
+      getItemId,
+      stageName[stageStack],
+      playerAdventureSprit_defoltEvent,
+      itemData,
+    );
     console.log(
       chalk.green(`\n1. 아이템 획득. 2. 아이템 변경 3. 무시하고 가기 `),
     );
@@ -862,43 +1432,203 @@ const adventureEvent_Succes = async (player, check) => {
   }
 };
 const adventureEvent_Battle = async (player, check) => {
+  // 배틀 걸림
+  let monsterId = 1; //몬스터 id
+  const checkStageAccount = () => {
+    switch (stageStack) {
+      case 1:
+        if (randomMaker(60)) {
+          monsterId = 1;
+        } else if (randomMaker(40)) {
+          monsterId = 2;
+        } else {
+          monsterId = 3;
+        }
+        break;
+      case 2:
+        if (randomMaker(60)) {
+          monsterId = 4;
+        } else {
+          monsterId = 5;
+        }
+        break;
+      case 3:
+        if (randomMaker(60)) {
+          monsterId = 6;
+        } else {
+          monsterId = 7;
+        }
+        break;
+    }
+  };
+  checkStageAccount();
+  let checkFirstWatch = true;
   const monster = new Monster();
-  while (player._hp > 0) {
+  //console.log(monster.hp);
+
+  const player_Atck = (player, monster, monsterId) => {
+    let checkDexOneMoreChance = true; //한번더 처음 터지면 체크
+    let checkOneMore = false;
+    let checkCritical = false; //크리티컬
+
+    while (true) {
+      if (
+        randomMaker(
+          checkDexOneMoreChance
+            ? parseInt(10 * (0.2 * player._dex))
+            : parseInt(2 * (0.2 * player._dex)),
+        )
+      ) {
+        checkOneMore = true; //한번더 활성화
+      }
+      if (parseInt(30 * (0.2 * player._luck))) {
+        checkCritical = true;
+      }
+      console.clear();
+      displayAdventure_Battle(
+        player,
+        monster,
+        checkCritical
+          ? `| 플레이어의 공격! : ${
+              player._atck * 2
+            } 크리티컬 데미지 | 몬스터 체력 : ${monster.hp} | 플레이어 체력 : ${
+              player.hp
+            } | `
+          : `| 플레이어의 공격! : ${player._atck} 데미지 | 몬스터 체력 : ${monster.hp} | 플레이어 체력 : ${player.hp} | `,
+        monsterId,
+        false,
+        stageName[stageStack],
+      );
+      const choice = readlineSync.question(' Please type in any key ');
+      checkCritical
+        ? (monster.hp = -player._atck * 2)
+        : (monster.hp = -player._atck);
+
+      if (monster.hp <= 0) {
+        //보상 메커니즘
+        console.clear();
+        displayAdventure_Battle(
+          player,
+          monster,
+          `| 몬스터를 해치웠습니다. 보상 : EXP [ ${monster._exp} ] gold [ ${monster.gold} ]|`,
+          1,
+          true,
+          stageName[stageStack],
+        );
+        const choice = readlineSync.question(' Please type in any key ');
+        player.level_Up(monster._exp);
+        playerGold += monster.gold;
+        if (randomMaker(parseInt(10 * (0.2 * player._luck)))) {
+          adventureEvent_Succes(player, check);
+        }
+        return;
+      }
+
+      if (checkOneMore) {
+        //한번더 공격 체크용도
+        checkDexOneMoreChance = false;
+        checkOneMore = false;
+        checkCritical = false;
+      } else {
+        // 몬스터 턴
+        monster_Atck(player, monster, monsterId);
+      }
+    }
+  };
+  const monster_Atck = (player, monster) => {
+    //몬스터 공격
+    let checkEvade = false;
+    checkEvade = randomMaker(parseInt(5 * (0.2 * player._dex)));
     console.clear();
-    displayStatus(day, player, monster);
-
-    logs.forEach((log) => console.log(log));
-
-    console.log(chalk.green(`\n1. 공격한다 2. 아무것도 하지않는다.`));
+    displayAdventure_Battle(
+      player,
+      monster,
+      checkEvade
+        ? `| 무사히 회피하셨습니다! |`
+        : `| 몬스터의 공격! : ${monster._atck} 데미지 |`,
+      checkEvade ? 3 : 2,
+      true,
+      stageName[stageStack],
+    );
+    const choice = readlineSync.question(' Please type in any key ');
+    checkEvade ? player.hp : (player.hp = -monster._atck); //공격력 비례 데미지
+    if (player.hp <= 0) {
+      console.clear();
+      displayAdventure_Battle(
+        player,
+        monster,
+        `| 체력을 모두 잃으셨습니다. |`,
+        4,
+        true,
+        stageName[stageStack],
+      );
+      const choice = readlineSync.question(' Please type in any key ');
+    }
+  };
+  while (true) {
+    console.clear();
+    displayAdventure_Battle(
+      player,
+      monster,
+      checkFirstWatch
+        ? `| ${monster._name[monsterId]} 가 나타났습니다. 몬스터 체력 : ${monster.hp} 몬스터 공격력 : ${monster._atck} |`
+        : `| 어서 행동을 선택해주세요! | 정보 | 이름 : ${monster._name[monsterId]}  몬스터 체쳑 : ${monster.hp} 몬스터 공격력 : ${monster._atck} |`,
+      1,
+      true,
+      stageName[stageStack],
+    );
+    console.log(
+      chalk.green(
+        `\n1. 싸운다 2. 도망친다 확률 ${parseInt(
+          30 * (0.2 * player._dex),
+        )}. 현재 체력 : ${player.hp} 현재 공격력 : ${player._atck} `,
+      ),
+    );
     const choice = readlineSync.question('choose_number : ');
-
-    // 플레이어의 선택에 따라 다음 행동 처리
-    logs.push(chalk.green(`${choice}를 선택하셨습니다.`));
+    switch (parseInt(choice)) {
+      case 1:
+        player_Atck(player, monster, monsterId);
+        return;
+      case 2:
+        if (randomMaker(parseInt(30 * (0.2 * player._dex)))) {
+          return;
+        }
+        monster_Atck(player, monster);
+        break;
+      default:
+        break;
+    }
   }
 };
 const adventureEvent_Failed = async (player, check) => {
+  // 아무것도 못얻음
   while (true) {
     console.clear();
     // 입력값 받아오기
-    displayAdventure_Failed(check);
+    displayAdventure_Failed(
+      check,
+      stageName[stageStack],
+      playerAdventureSprit_defoltEvent,
+    );
     console.log(chalk.green(`\n1. 다시 복귀한다. `));
     const choice = readlineSync.question(`choose_number : `);
     return;
   }
 };
 const inventory = async (player, change_id = 0, check_change) => {
+  // 인벤토리 기본 판매 교환 순
   let logs = [];
   while (true) {
     switch (playerInventory_Status) {
       case 0: // 기본 상태
         console.clear();
-        displayinventory();
+        displayinventory(itemData, playerInventory);
         console.log(chalk.green(`\n1. 이전 창으로 이동. `));
         const choice_defolt = readlineSync.question('choose_number : ');
         return;
       case 1: // 판매 상태
         console.clear();
-        displayinventory();
+        displayinventory(itemData, playerInventory);
         console.log(
           chalk.blue(`\n판매할 배낭 칸 입력 0~5 까지 `) +
             chalk.green(` 6. 이전 창으로 이동.  `),
@@ -920,7 +1650,7 @@ const inventory = async (player, change_id = 0, check_change) => {
           ) {
             playerInventory[parseInt(choice_sell)][1] -=
               parseInt(choice_sell_sub);
-            playerGold = parseInt(
+            playerGold += parseInt(
               //골드 계산식
               player._luck >= 40 // 럭이 일정수치 이상이면 가격을 더쳐줌
                 ? itemData[parseInt(choice_sell)][0] *
@@ -937,7 +1667,7 @@ const inventory = async (player, change_id = 0, check_change) => {
         }
       case 2: // 교환 상태
         console.clear();
-        displayinventory();
+        displayinventory(itemData, playerInventory);
         console.log(
           chalk.blue(`\n변경할 배낭 칸 입력 0~5 까지 `) +
             chalk.green(` 6. 이전 창으로 이동.  `),
@@ -971,6 +1701,7 @@ const inventory = async (player, change_id = 0, check_change) => {
 };
 
 const status = async (player) => {
+  // 상태 스텟 찍기
   let logs = [];
   console.clear();
   displayStatus(player);
@@ -1021,16 +1752,17 @@ const status = async (player) => {
   }
 };
 const camp = async (player) => {
-  while (player.hp > 0) {
+  // 휴식
+  while (true) {
     console.clear();
-    displayCamp(player);
+    displayCamp(player, dayStack);
     console.log(chalk.green(`\n1. 휴식을 취하기 2. 베이스캠프로 돌아가기.`));
     const choice = readlineSync.question('choose_number : ');
     switch (parseInt(choice)) {
       case 1:
         day++;
         dayStack = 1;
-        player.hp = player._hp * (3 - stageStack + 1) * 0.2;
+        player.hp = player._hp * (3 - dayStack + 1) * 0.2;
         return;
       case 2:
         return;
@@ -1041,6 +1773,7 @@ const camp = async (player) => {
   }
 };
 const playerStatusDice = async (dice, player) => {
+  // 처음 주사위 용도
   dice.random();
   while (true) {
     console.clear();
@@ -1063,323 +1796,7 @@ const playerStatusDice = async (dice, player) => {
     }
   }
 };
-function displayFristDice(dice) {
-  console.clear();
-  console.log(
-    chalk.magentaBright(
-      `\n========================= 주사위 를 던져주세요 ========================`,
-    ),
-  );
-  console.log(
-    chalk.cyanBright(`
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣴⣶⣦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣶⠿⠟⠛⠉⠁⠈⠙⠿⣶⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣴⡾⠟⠉⠀⠀⠀⣠⣤⣄⡀⠀⠀⠀⠉⠻⢷⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣶⠿⠛⠁⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⡆⠀⠀⠀⠀⠀⠉⠛⠿⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣴⡾⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⢿⣿⣿⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⣶⣄⡀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⣀⣤⣶⠟⠋⠁⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠙⠻⣶⣄⡀⠀⠀⠀
-⠀⠀⣀⣤⣶⠿⠛⠉⠀⠀⠀⠀⠀⠀⢠⣾⣿⣿⣷⠄⠀⠀⠀⠀⠀⣠⣴⣶⣤⡀⠀⠀⠀⠀⠀⣾⣿⣿⣿⡆⠀⠀⠀⠀⠈⠙⠻⣶⣤⡀
-⢰⡾⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣿⣿⡿⠁⠀⠀⠀⠀⠐⣿⣿⣿⣿⡏⠀⠀⠀⠀⠀⢿⣿⣿⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⣻⡇
-⠘⣿⡀⠿⠷⣦⣤⣀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠀⠀⠀⠀⠀⠀⠀⠉⠛⠛⠃⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⢀⣠⣴⡾⠟⠂⢽⡇
-⠀⢻⣇⠀⠀⠀⠉⠛⠿⣶⣤⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣠⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⣶⠟⠋⠁⠀⠀⠀⣺⡇
-⠀⠘⣿⡀⠀⠀⠀⠀⠀⠀⠈⠙⠛⠿⢶⣦⣤⣀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣷⠀⠀⠀⠀⠀⠀⣀⣴⡾⠛⠉⠀⠀⠀⠀⠀⠀⠀⣺⡇
-⠀⠀⢻⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠻⢷⣦⣄⡀⠀⠀⠸⣿⣿⡿⠏⠀⠀⢀⣤⣶⠿⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡇
-⠀⠀⠘⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⠷⣶⣄⡀⠀⠀⣀⣤⡾⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀ ⣿⠆
-⠀⠀⠀⢻⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢃⣄⠾⠛⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  ⠀⠀⣿⠁
-⠀⠀⠀⠸⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⠀⠀⠀⢰⣾⣿⣿⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀  ⢨⣿⠀
-⠀⠀⠀⠀⢿⡇⠀⠀⠀⠀⠀⠀⠀⢠⣴⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⠀⠀⠀⠙⢿⣿⠿⠃⠀⠀⣴⣶⣦⡀⠀⠀⠀⠀⠀⢸⣏⠀
-⠀⠀⠀⠀⢸⣷⠀⠀⠀⠀⠀⠀⢀⣿⣿⣿⣿⣷⡄⠀⠀⠀⠀⠀⠀⠀⢸⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⡇⠀⠀⡀⡀⠀⢸⡗⠀
-⠀⠀⠀⠀⠀⢿⡆⠀⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⠇⠀⠀⠀⠀⠀⠀⠀⠸⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠛⠛⠋⠀⠀⣼⣿⣿⡆⢸⡯⠀
-⠀⠀⠀⠀⠀⠘⣿⡀⠀⠀⠀⠀⠀⠀⠉⠋⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⠿⠟⠁⣸⡿⠀
-⠀⠀⠀⠀⠀⠀⢻⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⡿⠋⠁⠀
-⠀⠀⠀⠀⠀⠀⠈⢿⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣾⠟⠉⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢷⣤⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣴⠿⠋⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠻⢷⣦⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢘⣿⠀⠀⠀⠀⠀⠀⠀⢀⣤⡾⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢷⣤⣀⠀⠀⠀⠀⠀⠀⢸⣿⠀⠀⠀⠀⠀⢀⣴⡿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠿⣶⣄⡀⠀⠀⢸⣿⠀⠀⢀⣠⣾⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠻⣶⣄⣸⣿⣠⣴⠿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠻⠿⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-`),
-  );
-  console.log(
-    chalk.magentaBright(`| LUCK : ${dice._luck} `) +
-      chalk.magentaBright(`| STR : ${dice._str} `) +
-      chalk.magentaBright(`| DEX : ${dice._dex} `),
-  );
-  console.log(
-    chalk.magentaBright(
-      `====================================================================\n`,
-    ),
-  );
-}
-function displayDefolt(player) {
-  console.log(
-    chalk.magentaBright(
-      `\n===================== 여정을 선택해 주세요! ====================`,
-    ),
-  );
-  console.log(
-    chalk.cyanBright(`
-      ⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠
-      ⢻⡀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡀⠀⠀⠀⠀⠀⢀⡟
-      ⠘⢧⠀⠀⠀⠀⣰⠏⢷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡾⠹⣆⠀⠀⠀⢀⡼⠁
-      ⠀⠈⢷⡄⢀⡼⠃⠀⠸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠇⠀⠘⢧⠀⣠⠞⠁⠀
-      ⠀⠀⠀⠙⢿⡅⠀⠀⠀⢻⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡟⠀⠀⠀⢸⡿⠉⠀⠀⠀
-      ⠀⠀⠀⠀⠈⡧⠀⠀⠀⠀⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡾⠀⠀⠀⠀⢼⠁⠀⠀⠀⠀
-      ⠀⠀⠀⠀⣸⠇⠀⠀⠀⠀⠈⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡞⠁⠀⠀⠀⠀⠸⣇⠀⠀⠀⠀
-      ⠀⣤⠦⠟⠁⠀⠀⠀⠀⠀⠀⠀⢹⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠏⠀⠀⠀⠀⠀⠀⠀⠈⠳⢦⣤⠀
-      ⠀⠈⠻⣄⠀⠀⠀⠀⠀⠉⠳⠲⢾⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢈⡷⠖⠟⠁⠀⠀⠀⠀⠀⣠⠟⠀⠀
-      ⠀⠀⠀⠙⣦⠀⠀⠀⠀⠀⠀⠀⠘⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡼⠁⠀⠀⠀⠀⠀⠀⠀⣼⠋⠀⠀⠀
-      ⠀⠀⠀⠀⠈⢷⡀⠀⠀⠀⠀⠀⠀⠈⢳⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡞⠁⠀⠀⠀⠀⠀⠀⢀⡾⠁⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠻⣆⡀⠀⠀⠀⠀⠀⣀⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⡀⠀⠀⠀⠀⠀⢀⣴⠛⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⢀⣻⠄⠀⢰⡾⠚⠉⠀⠀⠀⠀⠀⠀⣀⣀⢀⡀⠀⠀⠀⠀⢀⣀⣄⠀⠀⠀⠙⠓⢶⡆⠀⢐⣯⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠐⢷⣋⠉⠙⢳⡟⠃⠀⠀⠀⠀⠀⣀⣰⠞⠉⠈⠁⠉⠛⣦⣤⠞⢋⣁⠈⢷⡀⠀⠀⠀⠈⠙⣾⠋⠉⣙⡷⠂⠀⠀⠀⠀⠀
-      ⠲⢶⠴⣤⣤⣠⣀⣍⣛⣶⢼⡇⠀⠀⠀⢀⡴⠞⢩⡏⠀⠀⠀⠀⠀⠀⠘⣏⠛⠿⣭⣧⠸⣇⠀⠀⠀⠀⢀⡷⣾⣫⣉⣠⣠⣤⡤⡴⡶⠒
-      ⠀⠠⣇⠀⠀⠀⢽⠈⠀⠀⠸⡅⠀⠀⠀⠹⢦⣀⣼⡇⠀⠀⠀⠀⠀⠀⠠⣗⣄⡴⢞⣹⠄⣹⠄⠀⠀⠀⢐⡇⠀⠀⢁⡯⠀⠀⠀⢴⠀⠀
-      ⠀⠀⣿⠖⠶⣄⢸⡅⠀⠀⠨⡇⠀⠀⠀⠀⠀⠁⠈⣧⠀⣀⠀⠀⠀⠀⢨⣷⡟⣋⣋⣁⡴⠏⠀⠀⠀⠀⢸⡇⠀⠀⢰⡇⢰⠖⠶⣿⠀⠀
-      ⠀⠀⢽⠀⠀⢿⣸⡃⠀⠀⢈⡿⠒⠂⠀⠀⠀⠀⠀⣸⠟⠙⠓⠶⠾⡖⢻⣿⣿⠉⠀⠁⠁⠀⠀⠀⠐⠚⢾⡃⠀⠀⢸⡇⡿⠀⢀⡗⠀⠀
-      ⠀⠀⢺⠅⠀⠈⠙⢙⡦⠀⠘⠃⠀⠀⠀⠀⠀⠀⣰⠏⠀⠀⠀⠀⠀⠀⠀⠹⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⢘⣧⣄⢴⡋⠋⠁⠀⢐⡇⠀⠀
-      ⠀⠀⢸⡇⠀⠀⠀⣸⠃⠀⠀⠀⠀⠀⠀⠀⠀⢰⣾⣷⡶⠶⠆⠛⠙⠛⠛⢻⡁⠀⠀⠀⠀⠀⢀⡴⠛⠚⠞⠥⣾⣝⣦⠀⠀⠀⢸⠇⠀⠀
-      ⠀⠀⠈⡧⠀⠀⠀⠋⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⣿⠅⠀⠀⠀⠀⠀⠀⠘⣇⠀⠀⠀⠀⠀⣾⠁⠀⠀⠀⠀⠀⠈⢹⡆⠀⠀⣼⠁⠀⠀
-      ⠀⠀⠀⣻⠀⣼⠛⠆⠀⠀⠀⠀⠀⠀⢠⣾⡿⠃⢀⡟⠀⠀⠀⠀⠀⠀⠀⠀⢹⡄⠀⠀⠀⠀⠈⢧⣀⣠⣀⣀⣀⡀⣸⠟⣧⠀⡯⠀⠀⠀
-      ⠀⠀⠀⠸⠅⠗⠀⠀⠀⠀⠀⠀⠀⠐⠿⠋⠀⠀⣼⠃⠀⠀⢀⣠⠴⣤⡀⠀⠀⠹⢦⡀⠀⠀⠀⠀⠉⠈⣽⣹⠉⠉⠉⠀⠺⠨⠇⠀⠀⠀
-      ⠀⠀⠀⢰⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣇⣀⣠⣰⠞⠁⠀⠀⠀⢹⣶⣾⣿⠁⠀⠀⠀⠀⠀⠀⠈⠋⠀⠀⠀⠀⠀⢸⡆⠀⠀⠀
-      ⠀⠀⣠⡞⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣿⣿⣯⠀⠀⠀⠀⢠⣾⣿⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢷⣄⠀⠀
-`),
-  );
-  console.log(
-    chalk.magentaBright(`| 날짜 : ${day} `) +
-      chalk.magentaBright(`| 시간 : ${dayStack} : ${dayName[dayStack]}`) +
-      chalk.magentaBright(`| 플레이어 소지금 : ${playerGold} : G `),
-    chalk.magentaBright(`| 남은 체력 : ${player.hp} : HP `),
-  );
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
-function displayAdventure(player) {
-  console.log(
-    chalk.magentaBright(
-      `\n===================== ${stageName[stageStack]} ====================`,
-    ),
-  );
-  console.log(
-    dayStack != 3
-      ? chalk.cyanBright(playerAdventureSprit_AM[stageStack])
-      : chalk.cyanBright(playerAdventureSprit_PM[stageStack]),
-  );
-  console.log(
-    chalk.cyanBright(
-      `| 날짜 : ${day} ${dayName[dayStack]}   : Stage : ${stageName[stageStack]} `,
-    ) +
-      chalk.blueBright(
-        `| 플레이어 정보 : ${player._level} | 남은 경험치 | ${
-          player._levelUpExp - player._exp
-        } | 남은 체력 :  ${player.hp} | `,
-      ),
-  );
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
-function displayAdventure_Failed(check) {
-  console.log(
-    chalk.magentaBright(
-      `\n======================= ${stageName[stageStack]} ======================`,
-    ),
-  );
-  console.log(chalk.cyanBright(playerAdventureSprit_defoltEvent[0]));
-  console.log(
-    chalk.cyanBright(
-      check
-        ? `| 아무것도 얻지 못하였습니다. ㅠ^ㅠ 그리고 길도 잃어버렸습니다. |`
-        : `| 아무것도 얻지 못하였습니다. ㅠ^ㅠ 하지만 제대로 길은 맞는 방향입니다. |`,
-    ),
-  );
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
-function displayAdventure_Succes(check, index) {
-  console.log(
-    chalk.magentaBright(
-      `\n======================= ${stageName[stageStack]} ======================`,
-    ),
-  );
-  console.log(chalk.cyanBright(playerAdventureSprit_defoltEvent[index]));
-  console.log(
-    chalk.cyanBright(
-      check
-        ? `| ${itemData[index][1]}을 획득 하셨습니다. 하지만 길을 잃어버렸습니다. |`
-        : `| ${itemData[index][1]}을 획득 하셨습니다. 그리고 제대로 길은 맞는 방향입니다. |`,
-    ),
-  );
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
-function displayinventory() {
-  console.log(
-    chalk.magentaBright(
-      `\n=========================== 인벤토리 ==========================`,
-    ),
-  );
-  console.log(
-    chalk.magentaBright(
-      `
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⡷⢦⡀⠀⠀⠀⠀⣰⢶⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡟⠀⠙⢦⡀⠀⣰⠏⠈⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⠇⠀⠀⠈⢳⣤⡏⠀⡀⠘⣇⠀⠀⣀⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⠋⠀⠀⠀⠀⠀⡿⠀⢸⡇⠀⢻⣠⡞⠉⢸⣇⣀⣄⣀⣤⣴⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠃⠀⠀⠀⠀⠀⢸⡇⠀⢺⡅⠀⠸⠋⠀⠀⠀⠉⠀⠀⠀⠀⠉⠓⢶⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡇⠀⠀⠀⠀⠀⠀⠸⡇⠀⠸⡇⡀⢀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⢦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⠀⠀⠀⠀⠀⠈⣧⠀⠀⣻⠃⠀⠁⣀⠀⠀⠀⠀⠀⢸⣶⠆⠀⠀⠀⢸⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⡇⠀⠀⠀⠀⠀⠀⠀⣹⠀⢠⡏⠀⠀⠀⢽⠷⣄⡀⠀⠀⠈⣸⣶⠓⢦⡀⢐⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣆⠀⠀⠀⠀⠀⢰⡏⠀⣺⠁⠀⠀⢀⡟⠀⠨⡝⠳⠶⢶⣿⣿⣇⢼⡃⠠⣇⡀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣆⣀⢠⡞⢻⠂⢀⡏⠀⠀⠰⢾⠗⠛⠛⠂⠀⠀⢸⣿⣿⢫⣿⣆⣸⠏⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣾⣿⡟⠀⢹⡄⢸⠇⠀⠀⢠⡟⠀⢀⣀⣀⣀⡀⠀⠉⠋⠺⢛⣈⡙⠳⠦⠙⣧⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⠿⠓⠓⠻⠳⣼⣇⠀⣠⠟⠀⣴⢿⣩⡏⠉⠉⣶⣶⢦⡀⠀⠈⢹⣧⣴⣞⣅⣀⠀⠀⠀⠀⠀⠀⠀⠀
-⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠰⣿⠟⠁⠀⠀⠀⠀⠀⠘⣿⣿⣿⣾⣶⣧⠀⢉⣤⣦⣦⡈⠁⢸⣇⣴⣶⣾⣅⠀⠀⠉⠈⢷⡀⠀⠀⠀⠀⠀⠀
-`,
-    ),
-  );
-  for (let key in playerInventory) {
-    console.log(
-      chalk.cyanBright(
-        `| ${key} 번째 칸 : ${itemData[playerInventory[key][0]][1]} `,
-      ) +
-        chalk.blueBright(
-          `| 아이템 정보 : ${itemData[playerInventory[key][0]][2]} `,
-        ) +
-        chalk.yellowBright(
-          `| 가격 정보 : ${itemData[playerInventory[key][0]][0]} `,
-        ) +
-        chalk.yellowBright(`| 중첩 갯수 : ${playerInventory[key][1]} |`),
-    );
-  }
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
-function displayStatus(player) {
-  console.log(
-    chalk.magentaBright(
-      `\n===================== 플레이어 정보창 ====================`,
-    ),
-  );
-  console.log(
-    chalk.cyanBright(`
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡤⠶⠲⠒⢓⡓⠛⡓⠓⡓⠲⠶⢦⡀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠇⠀⠀⢾⡷⢾⡷⠘⠗⠐⠟⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠀⠀⠸⡇⠀⠀⠈⠁⣠⣀⢀⡄⣠⡄⣀⠀⣸⠃⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣤⣀⠀⠀⠀⠀⢀⣀⠀⠀⠀⢀⡞⠹⡇⠀⠈⣧⠀⠀⣶⡆⠺⣿⣿⣿⣿⢃⣿⠁⣾⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡇⣏⠳⢦⡀⣠⠞⣻⡤⢶⣄⡟⢰⡆⢻⡀⠀⢻⠀⠀⢿⣷⣷⣿⣿⣿⣿⣿⠿⢸⡃⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣇⢻⡀⠈⠳⠋⠀⢀⡀⠈⠉⠛⢾⡅⢸⡇⠀⢸⡇⠀⠀⠈⠉⢿⣿⣿⡇⠀⠀⣾⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡈⠹⢶⣄⠀⣀⡸⢿⡒⣆⣄⡀⢹⡾⠀⠀⠀⠛⠛⡓⠶⠺⠛⠛⠛⠋⠋⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢷⠆⡾⢙⡿⢩⣿⡾⢷⣿⣬⣻⢬⡇⠀⠀⠀⠀⣿⣿⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢼⡰⡏⠸⡇⢺⣿⡿⠘⣿⣿⣹⣿⡧⠀⠀⠀⣀⠈⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣇⡧⠀⣹⠏⠉⠰⠻⠂⢉⣨⣽⡇⠀⠀⢸⣿⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⣿⡄⣸⠗⠶⠤⠴⠞⠋⠁⣹⠇⠀⠀⠀⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢾⣳⣾⡀⠀⣀⣠⣤⣤⡴⠟⣆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢨⡟⣿⣾⣿⡟⢉⣈⢉⡾⠳⣝⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡿⠞⠉⠀⠀⢹⣿⣿⣼⠇⠀⠈⠉⠻⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡶⠋⠀⠀⠀⠀⠀⢨⣿⣷⣾⠇⠀⠀⠀⠀⣼⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣇⠀⠀⠀⠀⠀⠀⢼⠛⠿⢻⡇⠀⠀⢀⣤⡟⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢘⣷⣶⠶⠤⠴⠤⠟⠀⠀⠀⠹⣤⢶⡋⠀⠙⢷⣀⣤⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣷⡞⠁⠀⠀⠀⠛⠛⠚⠶⠶⠖⠟⠂⠀⠁⠀⠀⢸⠏⣸⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⡶⠶⣟⠸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⠃⠉⠉⣹⠆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠻⠄⠁⠀⠙⠷⣤⡀⢠⣠⣤⡤⢤⠤⠶⠖⠶⠲⠖⠀⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀      
-`),
-  );
-  console.log(
-    chalk.cyanBright(` | 현재 플레이어 레벨: ${player._level} `) +
-      chalk.blueBright(`| 남은 스텟 포인트 : ${player._playerSkillPoint} `) +
-      chalk.redBright(`| 스텟 정보 |`),
-  );
-  console.log(
-    chalk.cyanBright(` | 0-0 `) +
-      chalk.blueBright(`| Luck : ${player._luck}`) +
-      chalk.redBright(
-        ` | 기본적인 이벤트 나올 확률 더 좋은 상자가 나올 확률을 늘려줍니다. |`,
-      ),
-  );
-  console.log(
-    chalk.cyanBright(`| 0^0 `) +
-      chalk.blueBright(`| STR : ${player._str}`) +
-      chalk.redBright(
-        `| 특정 이벤트에 필요하고 체력과 공격력 성장 계수에 영향을 끼칩니다. |`,
-      ),
-  );
-  console.log(
-    chalk.cyanBright(`| 0.0 `) +
-      chalk.blueBright(`| DEX : ${player._dex}`) +
-      chalk.redBright(
-        `| 안 좋은 이벤트시 받는 데미지를 줄여주거나 괴물 회피 확률 또는 도주 확률을 늘려줍니다. |`,
-      ),
-  );
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
-function displayCamp(player) {
-  console.log(
-    chalk.magentaBright(
-      `\n======================== 캠핑 =======================`,
-    ),
-  );
-  console.log(
-    chalk.cyanBright(`
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣠⣠⣠⣠⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡴⠖⠛⠉⠁⠉⠈⠀⠀⠀⠀⠈⣧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⠀⠀⠀⠀⢀⣀⡶⢶⡟⢻⡄⠀⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⡶⠛⠛⠋⣿⠹⡇⢸⠂⠀⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣇⠀⠙⠓⠛⠛⢛⣉⡉⢁⣀⣰⡏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠶⠶⠂⠛⢋⣉⡉⠁⠈⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⡀⠀⠀⠀⢀⣾⣧⣄⣄⢀⣀⣀⣄⣤⢤⡄⠀⣿⣿⡷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡏⣨⡉⠛⠳⠶⡟⠀⢀⡀⠈⠛⠛⢧⡴⢂⡼⠁⢀⣀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢳⣄⠙⠶⢶⣦⠀⠀⠀⠹⣆⡀⠀⠀⢻⡞⠁⠀⢺⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⢷⠂⣾⠉⢷⠴⠤⣤⡟⣿⣶⣆⡸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢺⡀⡗⠀⣸⠷⠲⠆⠀⣿⣯⣸⣿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣧⡇⠀⢼⠁⠀⠰⠛⠆⢀⣠⡽⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣷⢠⡟⠲⠶⠶⠲⠛⠉⠁⣻⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠹⣿⣏⣀⣀⣴⢦⣠⣴⢶⣶⣏⣀⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣽⣿⣿⡿⣿⠀⠉⠓⠶⣄⣽⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⡄⣰⠏⠀⠀⢶⣦⡈⠻⣿⣿⡍⡧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⠀⠀⣿⢹⣿⣿⡿⠁⠀⢰⢶⡼⠀⠙⣦⠈⠹⣾⠃⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢾⣹⠇⠀⣿⠸⣿⣿⠁⠀⣰⠏⠀⠀⠀⠀⢘⡇⠀⠸⣧⣀⣄⣠⣴⡿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣹⣧⡤⣽⡿⣾⡇⠀⠸⡇⠀⠀⠀⠀⠀⢸⠇⠀⢨⡿⡇⠀⠈⢹⡂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡃⠀⠀⢸⡇⠈⣧⠀⢠⡿⡶⢶⣶⡶⢛⣻⣷⠆⣼⠁⢿⠀⠀⢹⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⠀⣾⠁⠀⠹⣆⣸⡿⠋⡉⠋⠛⡛⣻⢿⣾⡃⠀⢸⣁⠀⣺⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⢀⡾⣿⣂⢀⣀⣸⣿⣿⣿⣿⣿⣿⢿⠿⡿⠟⠹⠒⠛⠙⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-      ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠁⠉⠉⠉⠁⠁⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-`),
-  );
-  console.log(
-    chalk.cyanBright(` | 캠핑 시 오전으로 초기화 체력 남은 스택 비례 회복 `) +
-      chalk.blueBright(`| 다음날까지 남은 스택 : ${3 - dayStack + 1} `) +
-      chalk.redBright(
-        `| 예상 회복량 :  ${player._hp * (3 - dayStack + 1) * 0.2} |`,
-      ),
-  );
-  console.log(
-    chalk.magentaBright(
-      `=============================================================\n`,
-    ),
-  );
-}
+// 어디서나 쓸 함수들
 const checkHaveItem = (value) => {
   //아이템 id값 받음
   // 인벤토리에 있나 체크용도
@@ -1402,7 +1819,7 @@ const checkHaveItem = (value) => {
 };
 const randomMaker = function (sucess) {
   //성공시 true 로 반환
-  if (parseInt(Math.random() * 100) <= sucess - 1) {
+  if (parseInt(Math.random() * 100) <= sucess) {
     return true;
   } else {
     return false;
