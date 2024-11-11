@@ -80,6 +80,6 @@ function start() {
   displayLobby();
   handleUserInput();
 }
-
+export function main_menu() {}
 // 게임 실행
 start();
