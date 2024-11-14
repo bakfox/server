@@ -1,6 +1,8 @@
 import chalk from 'chalk';
 import readlineSync from 'readline-sync';
 import { brotliCompress, brotliDecompress } from 'zlib';
+import { JSONFilePreset } from 'lowdb/node';
+import Recipe from './recipe.js';
 import {
   displayCamp,
   displayDefolt,
@@ -13,9 +15,8 @@ import {
   displayAdventure_Trap,
   displayAdventure,
   displayinventory,
+  displayPotionMaking,
 } from './display.js';
-import { log } from 'console';
-
 let maxDay = 100; //최종 날자
 let day = 1; // 날자
 let dayStack = 1; //아침 점심 오후
@@ -648,6 +649,7 @@ class Dice {
     }
   }
 }
+
 class Player {
   constructor() {
     this._hp = 100; //max hp입니다.
@@ -960,124 +962,26 @@ class Monster {
     this._gold += value;
   }
 }
-const adventure = async (player) => {
-  let stageMaxCount = 9; //최대 값
-  // 아랫값 선택지 선택시 다음 스테이지 이동 스텍 확률
-  let leftPercent = 0;
-  let middlePercent = 0;
-  let rightPercent = 0;
-  const changePercent = (value) => {
-    // 각 길의 확률 랜덤 설정
-    let index = 0; //반복 확인 값
-    while (value > 0) {
-      let temp = parseInt(Math.random() * value);
-      switch (index) {
-        case 0: //럭 증가
-          rightPercent = temp;
-          value -= temp;
-          break;
-        case 1: // 힘 증가
-          leftPercent = temp;
-          value -= temp;
-          break;
-        case 2: // 덱 증가
-          middlePercent = value;
-          value = 0;
-          break;
-      }
-      index++;
-    }
+const player = new Player();
+
+const potionMaking = async (player) => {
+  // 휴식
+  const recipe = new Recipe();
+
+  const make_Fire = (player, recipe) => {
+    let fire_Stack = 0;
   };
-  const checkDayCount = () => {
-    if (dayStack >= 3) {
-      day++; // 날짜
-      dayStack = 1;
-    } else {
-      dayStack++; // 날 오전 오후 저녁 정하기 위한 스텍
-    }
-  };
-  const checkStageCount = (value) => {
-    // 길찾는 매커니즘
-    if (randomMaker(value)) {
-      // 성공
-      stageCount++;
-      if (stageCount > stageMaxCount && maxStage > stageStack) {
-        stageStack++;
-        stageCount = 1;
-      }
-      return true;
-    } else {
-      //실패
-      stageCount--;
-      if (stageCount <= 1 && stageStack > 1) {
-        stageStack--;
-        stageCount = stageMaxCount - 1;
-      } else {
-        if (stageCount <= 1) {
-          stageCount = 1;
-        }
-      }
-      return false;
-    }
-  };
-  const randomEventCheck = (value, player) => {
-    // 기본 20퍼 50퍼 50퍼 나머지 실패. 개별 확률 적용
-    //이벤트 확률 적용
-    if (randomMaker(20)) {
-      //스페이셜
-      adventureEvent_Special(player, checkStageCount(value));
-    } else if (randomMaker(50)) {
-      //성공
-      adventureEvent_Succes(player, checkStageCount(value));
-    } else if (randomMaker(50)) {
-      //배틀
-    } else {
-      //실패
-      adventureEvent_Failed(player, checkStageCount(value));
-    }
-  };
+  const make_In = (player, recipe) => {};
+
   while (true) {
     console.clear();
-    changePercent(100);
-    displayAdventure(
-      player,
-      stageName,
-      stageStack,
-      playerAdventureSprit_AM,
-      playerAdventureSprit_PM,
-      dayName,
-      dayStack,
-      day,
-      stageCount,
-    );
-    console.log(
-      chalk.green(
-        `\n1.오른쪽으로 이동 ${rightPercent}% 2.왼쪽으로 이동 ${leftPercent}% 3.앞쪽으로 이동 ${middlePercent}% 4. 베이스켐프로 돌아가기`,
-      ),
-    );
-    player.hp == 0
-      ? console.log(chalk.redBright(`( hp : 0 이면 진행 불가 휴식 해주세요. )`))
-      : console.log();
-    const choice = readlineSync.question(`choose_number : `);
+    displayPotionMaking(recipe, itemData);
+    console.log(chalk.green(`\n1. 포션 제조하기 2. 베이스캠프로 돌아가기.`));
+    const choice = readlineSync.question('choose_number : ');
     switch (parseInt(choice)) {
       case 1:
-        if (player.hp != 0) {
-          checkDayCount();
-          adventureEvent_Battle(player, checkStageCount(rightPercent));
-        }
-        break;
+        return;
       case 2:
-        if (player.hp != 0) {
-          checkDayCount();
-          adventureEvent_Special(player, checkStageCount(leftPercent));
-        }
-        break;
-      case 3:
-        if (player.hp != 0) {
-          checkDayCount();
-        }
-        break;
-      case 4:
         return;
       default:
         console.log(chalk.green(`다시 입력해주세요.`));
@@ -1085,185 +989,4 @@ const adventure = async (player) => {
     }
   }
 };
-const adventureEvent_Battle = async (player, check) => {
-  // 배틀 걸림
-  let monsterId = 1; //몬스터 id
-  checkStageAccount();
-  const checkStageAccount = () => {
-    switch (stageStack) {
-      case 1:
-        if (randomMaker(60)) {
-          monsterId = 1;
-        } else if (randomMaker(40)) {
-          monsterId = 2;
-        } else {
-          monsterId = 3;
-        }
-        break;
-      case 2:
-        if (randomMaker(60)) {
-          monsterId = 4;
-        } else {
-          monsterId = 5;
-        }
-        break;
-      case 3:
-        if (randomMaker(60)) {
-          monsterId = 6;
-        } else {
-          monsterId = 7;
-        }
-        break;
-    }
-  };
-  let checkFirstWatch = true;
-  const monster = new Monster();
-  //console.log(monster.hp);
-
-  const player_Atck = (player, monster, monsterId) => {
-    let checkDexOneMoreChance = true; //한번더 처음 터지면 체크
-    let checkOneMore = false;
-    let checkCritical = false; //크리티컬
-
-    while (true) {
-      if (
-        randomMaker(
-          checkDexOneMoreChance
-            ? parseInt(10 * (0.2 * player._dex))
-            : parseInt(2 * (0.2 * player._dex)),
-        )
-      ) {
-        checkOneMore = true; //한번더 활성화
-      }
-      if (parseInt(30 * (0.2 * player._luck))) {
-        checkCritical = true;
-      }
-      console.clear();
-      displayAdventure_Battle(
-        player,
-        monster,
-        checkCritical
-          ? `| 플레이어의 공격! : ${
-              player._atck * 2
-            } 크리티컬 데미지 | 몬스터 체력 : ${monster.hp} | 플레이어 체력 : ${
-              player.hp
-            } | `
-          : `| 플레이어의 공격! : ${player._atck} 데미지 | 몬스터 체력 : ${monster.hp} | 플레이어 체력 : ${player.hp} | ` +
-              monsterId,
-        monsterId,
-        false,
-        stageName[stageStack],
-      );
-      const choice = readlineSync.question(' Please type in any key ');
-      checkCritical
-        ? (monster.hp = -player._atck * 2)
-        : (monster.hp = -player._atck);
-
-      if (monster.hp <= 0) {
-        //보상 메커니즘
-        console.clear();
-        displayAdventure_Battle(
-          player,
-          monster,
-          `| 몬스터를 해치웠습니다. 보상 : EXP [ ${monster._exp} ] gold [ ${monster.gold} ]|`,
-          1,
-          true,
-          stageName[stageStack],
-        );
-        const choice = readlineSync.question(' Please type in any key ');
-        player.level_Up(monster._exp);
-        playerGold += monster.gold;
-        if (randomMaker(parseInt(10 * (0.2 * player._luck)))) {
-          adventureEvent_Succes(player, check);
-        }
-        return;
-      }
-
-      if (checkOneMore) {
-        //한번더 공격 체크용도
-        checkDexOneMoreChance = false;
-        checkOneMore = false;
-        checkCritical = false;
-      } else {
-        // 몬스터 턴
-        monster_Atck(player, monster, monsterId);
-      }
-    }
-  };
-  const monster_Atck = (player, monster) => {
-    //몬스터 공격
-    let checkEvade = false;
-    checkEvade = randomMaker(parseInt(5 * (0.2 * player._dex)));
-    console.clear();
-    displayAdventure_Battle(
-      player,
-      monster,
-      checkEvade
-        ? `| 무사히 회피하셨습니다! |`
-        : `| 몬스터의 공격! : ${monster._atck} 데미지 |`,
-      checkEvade ? 3 : 2,
-      true,
-      stageName[stageStack],
-    );
-    const choice = readlineSync.question(' Please type in any key ');
-    checkEvade ? player.hp : (player.hp = -monster._atck); //공격력 비례 데미지
-    if (player.hp <= 0) {
-      console.clear();
-      displayAdventure_Battle(
-        player,
-        monster,
-        `| 체력을 모두 잃으셨습니다. |`,
-        4,
-        true,
-        stageName[stageStack],
-      );
-      const choice = readlineSync.question(' Please type in any key ');
-    }
-  };
-  while (true) {
-    console.clear();
-    displayAdventure_Battle(
-      player,
-      monster,
-      checkFirstWatch
-        ? `| ${monster._name[monsterId]} 가 나타났습니다. 몬스터 체력 : ${monster.hp} 몬스터 공격력 : ${monster._atck} |`
-        : `| 어서 행동을 선택해주세요! | 정보 | 이름 : ${monster._name[monsterId]}  몬스터 체쳑 : ${monster.hp} 몬스터 공격력 : ${monster._atck} |`,
-      1,
-      true,
-      stageName[stageStack],
-    );
-    console.log(
-      chalk.green(
-        `\n1. 싸운다 2. 도망친다 확률 ${parseInt(
-          30 * (0.2 * player._dex),
-        )}. 현재 체력 : ${player.hp} 현재 공격력 : ${player._atck} `,
-      ),
-    );
-    const choice = readlineSync.question('choose_number : ');
-    switch (parseInt(choice)) {
-      case 1:
-        player_Atck(player, monster, monsterId);
-        return;
-      case 2:
-        if (randomMaker(parseInt(30 * (0.2 * player._dex)))) {
-          return;
-        }
-        monster_Atck(player, monster);
-        break;
-      default:
-        break;
-    }
-  }
-};
-const randomMaker = function (sucess) {
-  //성공시 true 로 반환
-  if (parseInt(Math.random() * 100) <= sucess) {
-    return true;
-  } else {
-    return false;
-  }
-};
-
-const player = new Player();
-//adventure(player);
-adventureEvent_Battle(player, true);
+potionMaking(player);

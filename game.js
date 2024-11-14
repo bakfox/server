@@ -1,6 +1,8 @@
 import chalk from 'chalk';
 import readlineSync from 'readline-sync';
 import { brotliCompress, brotliDecompress } from 'zlib';
+import { JSONFilePreset } from 'lowdb/node';
+import { main_menu } from './server.js';
 import {
   displayCamp,
   displayDefolt,
@@ -13,8 +15,24 @@ import {
   displayAdventure_Trap,
   displayAdventure,
   displayinventory,
+  displayPotionMaking,
 } from './display.js';
-import { log } from 'console';
+
+//저장 관련
+import { return_save_file } from './achievement.js';
+let max_Object = {
+  luck_Max: 0,
+  stage_Max: 0,
+  gold_Max: 0,
+  dex_Max: 0,
+  monsterKiller_Max: 0,
+};
+import fs from 'fs';
+import Recipe from './recipe.js';
+
+const db = fs.existsSync('./file.json')
+  ? await JSONFilePreset('file.json', {})
+  : new Low(new JSONFile('file.json'), {});
 
 let maxDay = 100; //최종 날자
 let day = 1; // 날자
@@ -963,6 +981,7 @@ class Monster {
 }
 
 export async function startGame() {
+  return_save_file();
   console.clear();
   const player = new Player();
   const dice = new Dice();
@@ -974,9 +993,11 @@ export async function startGame() {
       displayDefolt(player, day, dayName[dayStack], dayStack, playerGold);
       console.log(
         player.hp != 0
-          ? chalk.green(`\n1. 인벤토리 2. 숲속으로 떠니기 3. 상태확인 4. 휴식`)
+          ? chalk.green(
+              `\n1. 인벤토리 2. 숲속으로 떠니기 3. 상태확인 4. 휴식 5. 메뉴로 나가기 (저장 없음)`,
+            )
           : chalk.green(
-              `\n1. 인벤토리 2. 숲속으로 떠니기 ( HP : 0 입장 불가 ) 3. 상태확인 4. 휴식`,
+              `\n1. 인벤토리 2. 숲속으로 떠니기 ( HP : 0 입장 불가 ) 3. 상태확인 4. 휴식 5. 메뉴로 나가기 (저장 없음)`,
             ),
       );
       const choice = readlineSync.question(`choose_number : `);
@@ -995,6 +1016,9 @@ export async function startGame() {
           break;
         case 4:
           await camp(player);
+          break;
+        case 5:
+          main_menu();
           break;
         default:
           break;
@@ -1046,6 +1070,7 @@ const adventure = async (player) => {
       if (stageCount > stageMaxCount && maxStage > stageStack) {
         stageStack++;
         stageCount = 1;
+        checkStage_max();
       }
       return true;
     } else {
@@ -1059,6 +1084,7 @@ const adventure = async (player) => {
           stageCount = 1;
         }
       }
+      checkStage_max();
       return false;
     }
   };
@@ -1139,7 +1165,7 @@ const adventureEvent_Special = async (player, check) => {
     }
   };
   randomEventSpecial();
-  const shop = (player) => {
+  const shop = async (player) => {
     //상점
     while (true) {
       console.clear();
@@ -1178,6 +1204,7 @@ const adventureEvent_Special = async (player, check) => {
                 let i = parseInt(Math.random() * 10);
                 randomMaker(50 + parseInt(player._luck / 4)) ? i : -i;
                 player._luck += i;
+                await checkLuck_max();
                 playerGold -= 1200;
               }
               break;
@@ -1187,6 +1214,7 @@ const adventureEvent_Special = async (player, check) => {
                 let i = parseInt(Math.random() * 10);
                 randomMaker(50 + parseInt(player._luck / 4)) ? i : -i;
                 player._dex += i;
+                await checkDex_max();
                 playerGold -= 1200;
               }
               break;
@@ -1466,7 +1494,7 @@ const adventureEvent_Battle = async (player, check) => {
   const monster = new Monster();
   //console.log(monster.hp);
 
-  const player_Atck = (player, monster, monsterId) => {
+  const player_Atck = async (player, monster, monsterId) => {
     let checkDexOneMoreChance = true; //한번더 처음 터지면 체크
     let checkOneMore = false;
     let checkCritical = false; //크리티컬
@@ -1518,6 +1546,11 @@ const adventureEvent_Battle = async (player, check) => {
         const choice = readlineSync.question(' Please type in any key ');
         player.level_Up(monster._exp);
         playerGold += monster.gold;
+        //업적 세이브
+
+        await checkMonsterKiller_max();
+        await checkGold_max();
+
         if (randomMaker(parseInt(10 * (0.2 * player._luck)))) {
           adventureEvent_Succes(player, check);
         }
@@ -1656,9 +1689,10 @@ const inventory = async (player, change_id = 0, check_change) => {
                 ? itemData[parseInt(choice_sell)][0] *
                     2 *
                     parseInt(choice_sell_sub)
-                : (itemData[parseInt(choice_sell)][0] / 2) *
+                : itemData[parseInt(choice_sell)][0] *
                     parseInt(choice_sell_sub),
             );
+            await checkGold_max();
             if (playerInventory[parseInt(choice_sell)][1] == 0) {
               //인벤 초기화
               playerInventory[parseInt(choice_sell)][0] = 0;
@@ -1699,7 +1733,31 @@ const inventory = async (player, change_id = 0, check_change) => {
     }
   }
 };
+const potionMaking = async (player) => {
+  // 휴식
+  const recipe = new Recipe();
 
+  const make_Fire = (player, recipe) => {
+    let fire_Stack = 0;
+  };
+  const make_In = (player, recipe) => {};
+
+  while (true) {
+    console.clear();
+    displayPotionMaking(recipe, itemData);
+    console.log(chalk.green(`\n1. 포션 제조하기 2. 베이스캠프로 돌아가기.`));
+    const choice = readlineSync.question('choose_number : ');
+    switch (parseInt(choice)) {
+      case 1:
+        return;
+      case 2:
+        return;
+      default:
+        console.log(chalk.green(`다시 입력해주세요.`));
+        break;
+    }
+  }
+};
 const status = async (player) => {
   // 상태 스텟 찍기
   let logs = [];
@@ -1717,6 +1775,7 @@ const status = async (player) => {
         if (player._playerSkillPoint > 0) {
           player._playerSkillPoint--;
           player._luck++;
+          await checkLuck_max(player);
           console.clear();
           displayStatus(player);
         } else {
@@ -1737,6 +1796,7 @@ const status = async (player) => {
         if (player._playerSkillPoint > 0) {
           player._playerSkillPoint--;
           player._dex++;
+          await checkDex_max(player);
           console.clear();
           displayStatus(player);
         } else {
@@ -1786,6 +1846,8 @@ const playerStatusDice = async (dice, player) => {
         player._luck = dice._luck;
         player._str = dice._str;
         player._dex = dice._dex;
+        await checkDex_max(player);
+        await checkLuck_max(player);
         return;
       case 2:
         dice.random();
@@ -1824,4 +1886,34 @@ const randomMaker = function (sucess) {
   } else {
     return false;
   }
+};
+//저장용 함수들
+const checkLuck_max = async (player) => {
+  await db.read();
+  db.data.luck_Max =
+    db.data.luck_Max < player._luck ? player._luck : db.data.luck_Max;
+  await db.write();
+};
+const checkGold_max = async () => {
+  await db.read();
+  db.data.gold_Max =
+    db.data.gold_Max < playerGold ? playerGold : db.data.gold_Max;
+  await db.write();
+};
+const checkDex_max = async (player) => {
+  await db.read();
+  db.data.dex_Max =
+    db.data.dex_Max < player._dex ? player._dex : db.data.dex_Max;
+  await db.write();
+};
+const checkMonsterKiller_max = async () => {
+  await db.read();
+  db.data.monsterKiller++;
+  await db.write();
+};
+const checkStage_max = async () => {
+  await db.read();
+  db.data.stage_Max =
+    db.data.stage_Max < stageStack ? stageStack : db.data.stage_Max;
+  await db.write();
 };
