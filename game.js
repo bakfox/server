@@ -15,10 +15,11 @@ import {
   displayAdventure_Trap,
   displayAdventure,
   displayinventory,
+  displayPotionMaking,
 } from './display.js';
 
+//저장 관련
 import { return_save_file } from './achievement.js';
-
 let max_Object = {
   luck_Max: 0,
   stage_Max: 0,
@@ -26,9 +27,8 @@ let max_Object = {
   dex_Max: 0,
   monsterKiller_Max: 0,
 };
-
-//저장 관련
 import fs from 'fs';
+import Recipe from './recipe.js';
 
 const db = fs.existsSync('./file.json')
   ? await JSONFilePreset('file.json', {})
@@ -1733,7 +1733,31 @@ const inventory = async (player, change_id = 0, check_change) => {
     }
   }
 };
+const potionMaking = async (player) => {
+  // 휴식
+  const recipe = new Recipe();
 
+  const make_Fire = (player, recipe) => {
+    let fire_Stack = 0;
+  };
+  const make_In = (player, recipe) => {};
+
+  while (true) {
+    console.clear();
+    displayPotionMaking(recipe, itemData);
+    console.log(chalk.green(`\n1. 포션 제조하기 2. 베이스캠프로 돌아가기.`));
+    const choice = readlineSync.question('choose_number : ');
+    switch (parseInt(choice)) {
+      case 1:
+        return;
+      case 2:
+        return;
+      default:
+        console.log(chalk.green(`다시 입력해주세요.`));
+        break;
+    }
+  }
+};
 const status = async (player) => {
   // 상태 스텟 찍기
   let logs = [];
