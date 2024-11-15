@@ -2,18 +2,22 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import readlineSync from 'readline-sync';
 import { startGame } from './game.js';
+import { achievement, return_save_file } from './achievement.js';
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
 
 // 로비 화면을 출력하는 함수
 function displayLobby() {
   console.clear();
-
+  console.log(chalk.white(``)); // 크기 테스트 용도
   // 타이틀 텍스트
   console.log(
     chalk.cyan(
-      figlet.textSync('RL- Javascript', {
-        font: 'Standard',
+      figlet.textSync('legend of leaf', {
+        //font: 'Standard',
         horizontalLayout: 'default',
         verticalLayout: 'default',
+        font: 'Hollywood',
       }),
     ),
   );
@@ -44,21 +48,22 @@ function displayLobby() {
 
 // 유저 입력을 받아 처리하는 함수
 function handleUserInput() {
-  const choice = readlineSync.question('입력: ');
+  const choice = readlineSync.question('ENTER : ');
 
   switch (choice) {
     case '1':
       console.log(chalk.green('게임을 시작합니다.'));
       // 여기에서 새로운 게임 시작 로직을 구현
+      console.clear();
       startGame();
       break;
     case '2':
-      console.log(chalk.yellow('구현 준비중입니다.. 게임을 시작하세요'));
-      // 업적 확인하기 로직을 구현
-      handleUserInput();
+      console.clear();
+      achievement();
       break;
     case '3':
-      console.log(chalk.blue('구현 준비중입니다.. 게임을 시작하세요'));
+      console.clear();
+      console.log(chalk.yellow('구현 준비중입니다.. 게임을 시작하세요'));
       // 옵션 메뉴 로직을 구현
       handleUserInput();
       break;
@@ -75,9 +80,15 @@ function handleUserInput() {
 
 // 게임 시작 함수
 function start() {
+  checkSaveFile();
   displayLobby();
   handleUserInput();
 }
-
+export function main_menu() {
+  start();
+}
+const checkSaveFile = () => {
+  return_save_file();
+};
 // 게임 실행
 start();
