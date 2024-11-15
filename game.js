@@ -15,7 +15,6 @@ import {
   displayAdventure_Trap,
   displayAdventure,
   displayinventory,
-  displayPotionMaking,
 } from './display.js';
 
 //저장 관련
@@ -44,7 +43,7 @@ let stageCount = 1; //작은 범위;
 let specialEventStatus = 0; // 스페이셜 이벤트
 let battleEnd = true; // 배틀 상태
 
-let playerGold = 10000; // 플레이어 관련
+let playerGold = 0; // 플레이어 관련
 
 const playerAdventureSprit_SpecialEvent = {
   //0: 상점 1: 덫 2: 안전하게 탈출 3 : 머리부터 떨어짐 4: 도와주로 옴  5: 상자 6: 상자 보상 7: 상자 미믹
@@ -1260,6 +1259,7 @@ const adventureEvent_Special = async (player, check) => {
       switch (parseInt(choice)) {
         case 1:
           if (player._dex >= 40) {
+            console.clear();
             displayAdventure_Trap(
               ` 완벽하게 탈출하셨습니다! `,
               2,
@@ -1274,6 +1274,7 @@ const adventureEvent_Special = async (player, check) => {
           }
           break;
         case 2:
+          console.clear();
           displayAdventure_Trap(
             ` 밧줄이 오래돼서 그대로 떨어지셨습니다. -${parseInt(
               50 - (player._dex >= 50 ? 50 : player._dex),
@@ -1288,6 +1289,7 @@ const adventureEvent_Special = async (player, check) => {
           return;
         case 3: //도와줄 사람 있으면 탈출
           if (randomMaker(40 + parseInt(50 / player._luck))) {
+            console.clear();
             displayAdventure_Trap(
               ` 다행히 주변에 도와줄 사람이 있었습니다. `,
               3,
@@ -1297,6 +1299,7 @@ const adventureEvent_Special = async (player, check) => {
             );
             const choice = readlineSync.question(` Please type in any key `);
           } else {
+            console.clear();
             displayAdventure_Trap(
               ` 하루가 지나자 밧줄이 오래돼서 그대로 떨어지셨습니다. - ${parseInt(
                 50 - (player._dex >= 50 ? 50 : player._dex),
@@ -1333,6 +1336,7 @@ const adventureEvent_Special = async (player, check) => {
       switch (parseInt(choice)) {
         case 1:
           if (randomMaker(20 + player._luck * 1.25)) {
+            console.clear();
             displayAdventure_Trap(
               ` 엄청난 보상이에요 !. ${
                 2000 * parseInt(player._luck / 10) == 0
@@ -1353,6 +1357,7 @@ const adventureEvent_Special = async (player, check) => {
                 : 2000 * parseInt(player._luck / 10);
             return;
           } else {
+            console.clear();
             displayAdventure_Trap(
               ` 이런 커다란 미믹이였습니다!. -${parseInt(
                 70 - (player._dex >= 70 ? 70 : player._dex),
@@ -1686,10 +1691,10 @@ const inventory = async (player, change_id = 0, check_change) => {
             playerGold += parseInt(
               //골드 계산식
               player._luck >= 40 // 럭이 일정수치 이상이면 가격을 더쳐줌
-                ? itemData[parseInt(choice_sell)][0] *
+                ? itemData[playerInventory[parseInt(choice_sell)][0]][0] *
                     2 *
                     parseInt(choice_sell_sub)
-                : itemData[parseInt(choice_sell)][0] *
+                : itemData[playerInventory[parseInt(choice_sell)][0]][0] *
                     parseInt(choice_sell_sub),
             );
             await checkGold_max();
@@ -1733,7 +1738,7 @@ const inventory = async (player, change_id = 0, check_change) => {
     }
   }
 };
-const potionMaking = async (player) => {
+/*const potionMaking = async (player) => {
   // 휴식
   const recipe = new Recipe();
 
@@ -1757,7 +1762,7 @@ const potionMaking = async (player) => {
         break;
     }
   }
-};
+};*/
 const status = async (player) => {
   // 상태 스텟 찍기
   let logs = [];
